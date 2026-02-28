@@ -263,8 +263,13 @@ class Manager:
             self._log_callback(callback, f"✗ 打开失败: {e}")
             return False
 
-    def is_running(self) -> bool:
-        """检查OpenClaw是否运行中"""
+    def check_running(self) -> bool:
+        """
+        检查OpenClaw是否运行中
+
+        Returns:
+            运行中返回True，否则返回False
+        """
         if not self.is_running:
             return False
 

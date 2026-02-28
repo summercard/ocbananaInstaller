@@ -22,7 +22,7 @@ class Installer:
         self.downloader = Downloader()
 
         # OpenClaw的npm包信息
-        self.npm_package = 'openclaw-cn'
+        self.npm_package = 'openclaw'
         self.npm_registry = 'https://registry.npmjs.org/'
 
     def install(

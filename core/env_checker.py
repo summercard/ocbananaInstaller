@@ -135,8 +135,10 @@ class EnvChecker:
             满足要求返回True，否则返回False
         """
         try:
-            # 获取当前工作目录的磁盘信息
-            usage = shutil.disk_usage(os.getcwd())
+            # 获取用户主目录所在磁盘的信息（更准确的安装位置检查）
+            import os
+            home_dir = os.path.expanduser("~")
+            usage = shutil.disk_usage(home_dir)
 
             # 转换为MB
             free_mb = usage.free / (1024 * 1024)

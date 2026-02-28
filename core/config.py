@@ -32,10 +32,13 @@ class Config:
 
     def _load_default_config(self) -> Dict[str, Any]:
         """加载默认配置"""
+        # 获取默认安装目录
+        default_install_dir = os.path.join(os.path.expanduser("~"), "openclaw")
+        
         return {
             "openclaw": {
                 "version": "latest",
-                "install_dir": "",
+                "install_dir": default_install_dir,
                 "port": 3000,
                 "auto_start": False
             },
