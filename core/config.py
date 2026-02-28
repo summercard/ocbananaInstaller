@@ -40,7 +40,11 @@ class Config:
                 "version": "latest",
                 "install_dir": default_install_dir,
                 "port": 3000,
-                "auto_start": False
+                "auto_start": False,
+                "api_type": "minimax",
+                "api_url": "https://api.minimax.chat/v1",
+                "api_key": "",
+                "model_name": "MiniMax-M2.1"
             },
             "paths": {
                 "nodejs": "",

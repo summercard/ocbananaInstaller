@@ -4,9 +4,11 @@ OpenClawInstaller的主界面
 """
 
 import tkinter as tk
-from tkinter import ttk, scrolledtext
+from tkinter import ttk, scrolledtext, filedialog
 from typing import Optional
 from utils.logger import get_logger
+from core.config import Config
+from core.installer import Installer
 
 class MainWindow:
     """主窗口类"""
@@ -222,31 +224,91 @@ class MainWindow:
         # 配置项
         self.config_vars = {}
 
-        configs = [
-            ("安装目录", "install_dir"),
-            ("端口号", "port"),
-            ("自动启动", "auto_start")
-        ]
+        # 安装目录（可选择）
+        install_dir_row = ttk.Frame(config_frame)
+        install_dir_row.pack(fill=tk.X, padx=10, pady=5)
 
-        for i, (label_text, key) in enumerate(configs):
-            row_frame = ttk.Frame(config_frame)
-            row_frame.pack(fill=tk.X, padx=10, pady=5)
+        ttk.Label(install_dir_row, text="安装目录", width=15).pack(side=tk.LEFT, padx=(0, 10))
 
-            label = ttk.Label(row_frame, text=label_text, width=15)
-            label.pack(side=tk.LEFT, padx=(0, 10))
+        self.config_vars["install_dir"] = tk.StringVar()
+        entry = ttk.Entry(install_dir_row, textvariable=self.config_vars["install_dir"], width=25)
+        entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
 
-            if key == "auto_start":
-                # 复选框
-                var = tk.BooleanVar()
-                check = ttk.Checkbutton(row_frame, variable=var)
-                check.pack(side=tk.LEFT)
-                self.config_vars[key] = var
-            else:
-                # 输入框
-                var = tk.StringVar()
-                entry = ttk.Entry(row_frame, textvariable=var, width=30)
-                entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
-                self.config_vars[key] = var
+        ttk.Button(
+            install_dir_row,
+            text="浏览...",
+            command=lambda: self._select_install_dir()
+        ).pack(side=tk.LEFT, padx=(5, 0))
+
+        # ==================== API 配置区域 ====================
+        api_config_frame = ttk.LabelFrame(config_frame, text="API 配置")
+        api_config_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # API 类型选择
+        api_type_row = ttk.Frame(api_config_frame)
+        api_type_row.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(api_type_row, text="API 类型", width=15).pack(side=tk.LEFT, padx=(0, 10))
+
+        self.config_vars["api_type"] = tk.StringVar(value="minimax")
+        api_type_combo = ttk.Combobox(
+            api_type_row,
+            textvariable=self.config_vars["api_type"],
+            values=["minimax", "anthropic", "openai", "custom"],
+            state="readonly",
+            width=15
+        )
+        api_type_combo.pack(side=tk.LEFT)
+        api_type_combo.bind("<<ComboboxSelected>>", self._on_api_type_changed)
+
+        # API 地址
+        api_url_row = ttk.Frame(api_config_frame)
+        api_url_row.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(api_url_row, text="API 地址", width=15).pack(side=tk.LEFT, padx=(0, 10))
+
+        self.config_vars["api_url"] = tk.StringVar()
+        entry = ttk.Entry(api_url_row, textvariable=self.config_vars["api_url"], width=35)
+        entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # API Key
+        api_key_row = ttk.Frame(api_config_frame)
+        api_key_row.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(api_key_row, text="API Key", width=15).pack(side=tk.LEFT, padx=(0, 10))
+
+        self.config_vars["api_key"] = tk.StringVar()
+        self.api_key_entry = ttk.Entry(api_key_row, textvariable=self.config_vars["api_key"], width=35, show="*")
+        self.api_key_entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # 显示/隐藏 API Key
+        self.api_key_visible = tk.BooleanVar(value=False)
+        ttk.Checkbutton(
+            api_key_row,
+            text="显示",
+            variable=self.api_key_visible,
+            command=self._toggle_api_key_visibility
+        ).pack(side=tk.LEFT, padx=(5, 0))
+
+        # 模型名称
+        model_name_row = ttk.Frame(api_config_frame)
+        model_name_row.pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(model_name_row, text="模型名称", width=15).pack(side=tk.LEFT, padx=(0, 10))
+
+        self.config_vars["model_name"] = tk.StringVar()
+        entry = ttk.Entry(model_name_row, textvariable=self.config_vars["model_name"], width=35)
+        entry.pack(side=tk.LEFT, fill=tk.X, expand=True)
+
+        # ==================== 自动启动 ====================
+        auto_start_row = ttk.Frame(config_frame)
+        auto_start_row.pack(fill=tk.X, padx=10, pady=10)
+
+        ttk.Label(auto_start_row, text="自动启动", width=15).pack(side=tk.LEFT, padx=(0, 10))
+
+        var = tk.BooleanVar()
+        self.config_vars["auto_start"] = var
+        ttk.Checkbutton(auto_start_row, variable=var).pack(side=tk.LEFT)
 
         # 按钮区域
         button_frame = ttk.Frame(frame)
@@ -365,19 +427,205 @@ class MainWindow:
         self.progress_bar.start(10)
         self.progress_label.config(text="正在安装...")
 
+    def _select_install_dir(self):
+        """选择安装目录"""
+        directory = filedialog.askdirectory(
+            title="选择安装目录",
+            initialdir=self.config_vars["install_dir"].get() or "~"
+        )
+        if directory:
+            self.config_vars["install_dir"].set(directory)
+            self.logger.info(f"选择安装目录: {directory}")
+
+    def _on_api_type_changed(self, event=None):
+        """API类型变更时自动填充默认配置"""
+        api_type = self.config_vars["api_type"].get()
+        
+        # 根据API类型预设默认配置
+        defaults = {
+            "minimax": {
+                "url": "https://api.minimax.chat/v1",
+                "model": "MiniMax-M2.1"
+            },
+            "anthropic": {
+                "url": "https://api.anthropic.com",
+                "model": "claude-sonnet-4-5"
+            },
+            "openai": {
+                "url": "https://api.openai.com/v1",
+                "model": "gpt-4o"
+            },
+            "custom": {
+                "url": "",
+                "model": ""
+            }
+        }
+        
+        if api_type in defaults:
+            if not self.config_vars["api_url"].get():  # 只在空的时候填充
+                self.config_vars["api_url"].set(defaults[api_type]["url"])
+            if not self.config_vars["model_name"].get():
+                self.config_vars["model_name"].set(defaults[api_type]["model"])
+
+    def _toggle_api_key_visibility(self):
+        """切换API Key显示/隐藏"""
+        if self.api_key_visible.get():
+            self.api_key_entry.config(show="")
+        else:
+            self.api_key_entry.config(show="*")
+
     def _save_config(self):
         """保存配置"""
         self.logger.info("保存配置...")
-        self._log_message("配置已保存")
+        try:
+            config = Config()
+            config.load()
 
-        # TODO: 实现配置保存逻辑
+            # 读取GUI中的配置
+            install_dir = self.config_vars["install_dir"].get()
+            api_type = self.config_vars["api_type"].get()
+            api_url = self.config_vars["api_url"].get()
+            api_key = self.config_vars["api_key"].get()
+            model_name = self.config_vars["model_name"].get()
+            auto_start = self.config_vars["auto_start"].get()
+
+            # 保存安装目录
+            if install_dir:
+                config.set("openclaw.install_dir", install_dir)
+                config.set("paths.openclaw", install_dir)
+
+            # 保存自动启动
+            config.set("openclaw.auto_start", auto_start)
+
+            # 保存API配置到 OpenClaw 的配置文件
+            self._save_openclaw_config(api_type, api_url, api_key, model_name)
+
+            config.save()
+
+            self._log_message(f"配置已保存")
+            self.logger.info(f"配置已保存")
+        except Exception as e:
+            self._log_message(f"保存配置失败: {e}")
+            self.logger.error(f"保存配置失败: {e}")
+
+    def _save_openclaw_config(self, api_type, api_url, api_key, model_name):
+        """保存到 OpenClaw 配置文件"""
+        try:
+            import json
+            import os
+            
+            openclaw_config_path = os.path.join(os.path.expanduser("~"), ".openclaw", "openclaw.json")
+            
+            # 读取现有配置
+            if os.path.exists(openclaw_config_path):
+                with open(openclaw_config_path, 'r', encoding='utf-8') as f:
+                    oc_config = json.load(f)
+            else:
+                oc_config = {}
+            
+            # 设置环境变量
+            if "env" not in oc_config:
+                oc_config["env"] = {}
+            
+            # 根据API类型设置对应的环境变量和配置
+            if api_type == "minimax":
+                oc_config["env"]["MINIMAX_API_KEY"] = api_key
+                if "models" not in oc_config:
+                    oc_config["models"] = {"mode": "merge", "providers": {}}
+                oc_config["models"]["providers"]["minimax"] = {
+                    "baseUrl": api_url or "https://api.minimax.chat/v1",
+                    "apiKey": "${MINIMAX_API_KEY}",
+                    "api": "openai-completions",
+                    "models": [{"id": model_name or "MiniMax-M2.1", "name": model_name or "MiniMax M2.1", "reasoning": False, "input": ["text"], "contextWindow": 200000, "maxTokens": 8192}]
+                }
+                oc_config.setdefault("agents", {}).setdefault("defaults", {})["model"] = {"primary": f"minimax/{model_name or 'MiniMax-M2.1'}"}
+                
+            elif api_type == "anthropic":
+                oc_config["env"]["ANTHROPIC_API_KEY"] = api_key
+                oc_config.setdefault("agents", {}).setdefault("defaults", {})["model"] = {"primary": f"anthropic/{model_name or 'claude-sonnet-4-5'}"}
+                
+            elif api_type == "openai":
+                oc_config["env"]["OPENAI_API_KEY"] = api_key
+                oc_config.setdefault("agents", {}).setdefault("defaults", {})["model"] = {"primary": f"openai/{model_name or 'gpt-4o'}"}
+            
+            # 保存配置
+            with open(openclaw_config_path, 'w', encoding='utf-8') as f:
+                json.dump(oc_config, f, indent=2, ensure_ascii=False)
+            
+            self._log_message(f"OpenClaw配置已更新: {openclaw_config_path}")
+            self.logger.info(f"OpenClaw配置已更新: {openclaw_config_path}")
+            
+        except Exception as e:
+            self._log_message(f"保存OpenClaw配置失败: {e}")
+            self.logger.error(f"保存OpenClaw配置失败: {e}")
 
     def _load_config(self):
         """加载配置"""
         self.logger.info("加载配置...")
-        self._log_message("配置已加载")
+        try:
+            config = Config()
+            config.load()
 
-        # TODO: 实现配置加载逻辑
+            # 加载安装目录
+            install_dir = config.get("openclaw.install_dir", "")
+            self.config_vars["install_dir"].set(install_dir)
+
+            # 加载自动启动
+            auto_start = config.get("openclaw.auto_start", False)
+            self.config_vars["auto_start"].set(auto_start)
+
+            # 从 OpenClaw 配置中加载 API 配置
+            self._load_openclaw_config()
+
+            self._log_message("配置已加载")
+            self.logger.info("配置已加载")
+        except Exception as e:
+            self._log_message(f"加载配置失败: {e}")
+            self.logger.error(f"加载配置失败: {e}")
+
+    def _load_openclaw_config(self):
+        """从 OpenClaw 配置文件加载 API 配置"""
+        try:
+            import json
+            import os
+            
+            openclaw_config_path = os.path.join(os.path.expanduser("~"), ".openclaw", "openclaw.json")
+            
+            if os.path.exists(openclaw_config_path):
+                with open(openclaw_config_path, 'r', encoding='utf-8') as f:
+                    oc_config = json.load(f)
+                
+                # 尝试识别 API 类型并加载
+                env = oc_config.get("env", {})
+                
+                if "MINIMAX_API_KEY" in env:
+                    self.config_vars["api_type"].set("minimax")
+                    providers = oc_config.get("models", {}).get("providers", {})
+                    if "minimax" in providers:
+                        self.config_vars["api_url"].set(providers["minimax"].get("baseUrl", ""))
+                        models = providers["minimax"].get("models", [])
+                        if models:
+                            self.config_vars["model_name"].set(models[0].get("id", "MiniMax-M2.1"))
+                    # API Key 需要用户重新输入（不存储明文）
+                    
+                elif "ANTHROPIC_API_KEY" in env:
+                    self.config_vars["api_type"].set("anthropic")
+                    self.config_vars["api_url"].set("https://api.anthropic.com")
+                    agents = oc_config.get("agents", {}).get("defaults", {}).get("model", {})
+                    primary = agents.get("primary", "")
+                    if primary.startswith("anthropic/"):
+                        self.config_vars["model_name"].set(primary.replace("anthropic/", ""))
+                        
+                elif "OPENAI_API_KEY" in env:
+                    self.config_vars["api_type"].set("openai")
+                    self.config_vars["api_url"].set("https://api.openai.com/v1")
+                    agents = oc_config.get("agents", {}).get("defaults", {}).get("model", {})
+                    primary = agents.get("primary", "")
+                    if primary.startswith("openai/"):
+                        self.config_vars["model_name"].set(primary.replace("openai/", ""))
+                
+        except Exception as e:
+            self.logger.debug(f"加载OpenClaw配置失败: {e}")
 
     def _start_openclaw(self):
         """启动OpenClaw"""
