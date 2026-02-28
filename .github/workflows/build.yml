@@ -41,14 +41,14 @@ jobs:
     - name: 构建 Windows 版本
       if: matrix.os == 'windows-latest'
       run: |
-        pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm --hidden-import=requests --hidden-import=urllib3 main.py
+        pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm simple_installer.py
         cd dist
         mv OpenClawInstaller.exe OpenClawInstaller-Windows-x64.exe
 
     - name: 构建 macOS 版本
       if: matrix.os == 'macos-latest'
       run: |
-        pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm --hidden-import=requests --hidden-import=urllib3 main.py
+        pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm simple_installer.py
         cd dist
         ls -la
         if [ -f "OpenClawInstaller.app" ]; then
@@ -60,7 +60,7 @@ jobs:
     - name: 构建 Linux 版本
       if: matrix.os == 'ubuntu-latest'
       run: |
-        pyinstaller --name=OpenClawInstaller --onefile --clean --noconfirm --hidden-import=requests --hidden-import=urllib3 main.py
+        pyinstaller --name=OpenClawInstaller --onefile --clean --noconfirm simple_installer.py
         cd dist
         tar czf OpenClawInstaller-Linux-x64.tar.gz OpenClawInstaller
 
