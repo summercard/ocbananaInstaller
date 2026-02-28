@@ -47,23 +47,17 @@ jobs:
     - name: 构建 Windows 版本
       if: matrix.os == 'windows-latest'
       run: |
-        pyinstaller openclaw-installer.spec
-        cd dist
-        ls -la
+        pyinstaller --name=OpenClawInstaller-v${{ steps.version.outputs.version }}-Windows-x64 --windowed --onefile --clean --noconfirm --collect-all requests main.py
 
     - name: 构建 macOS 版本
       if: matrix.os == 'macos-latest'
       run: |
-        pyinstaller openclaw-installer.spec
-        cd dist
-        ls -la
+        pyinstaller --name=OpenClawInstaller-v${{ steps.version.outputs.version }}-macOS-x64 --windowed --onefile --clean --noconfirm --collect-all requests main.py
 
     - name: 构建 Linux 版本
       if: matrix.os == 'ubuntu-latest'
       run: |
-        pyinstaller openclaw-installer.spec
-        cd dist
-        ls -la
+        pyinstaller --name=OpenClawInstaller-v${{ steps.version.outputs.version }}-Linux-x64 --onefile --clean --noconfirm --collect-all requests main.py
 
     - name: 上传构建产物
       uses: actions/upload-artifact@v4
