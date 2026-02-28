@@ -50,6 +50,7 @@ jobs:
       run: |
         pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm main.py
         cd dist
+        ls -la
         if [ -f "OpenClawInstaller.app" ]; then
           zip -r OpenClawInstaller-macOS-x64.zip OpenClawInstaller.app
         else
@@ -67,8 +68,7 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: OpenClawInstaller-${{ matrix.os_name }}
-        path: |
-          dist/OpenClawInstaller-*${{ matrix.os_name }}*
+        path: dist/*
         retention-days: 30
 
   release:
