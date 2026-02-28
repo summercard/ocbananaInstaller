@@ -6,9 +6,34 @@ OpenClawInstaller的主界面
 import tkinter as tk
 from tkinter import ttk, scrolledtext, filedialog
 from typing import Optional
+import os
 from utils.logger import get_logger
 from core.config import Config
 from core.installer import Installer
+
+# 获取资源目录
+def get_asset_path(filename):
+    """获取资源文件路径"""
+    return os.path.join(os.path.dirname(__file__), 'assets', filename)
+
+def setup_styles():
+    """设置自定义样式"""
+    style = ttk.Style()
+    
+    # 尝试使用 dark 主题
+    try:
+        style.theme_use('clam')
+    except:
+        pass
+    
+    # 配置样式
+    style.configure('TFrame', background='#1a1a2e')
+    style.configure('TLabel', background='#1a1a2e', foreground='#ffffff')
+    style.configure('TLabelframe', background='#16213e', foreground='#ffffff')
+    style.configure('TLabelframe.Label', background='#16213e', foreground='#00d9ff', font=('微软雅黑', 10, 'bold'))
+    style.configure('TButton', background='#0f3460', foreground='#ffffff', font=('微软雅黑', 10))
+    
+    return style
 
 class MainWindow:
     """主窗口类"""
@@ -23,6 +48,9 @@ class MainWindow:
         self.root = root
         self.logger = get_logger()
 
+        # 设置样式
+        setup_styles()
+        
         # 当前页面
         self.current_page = None
 
@@ -39,14 +67,42 @@ class MainWindow:
         self.root.title("OpenClaw跨平台安装工具")
 
         # 窗口大小
-        self.root.geometry("800x600")
-        self.root.minsize(600, 400)
+        self.root.geometry("900x650")
+        self.root.minsize(800, 600)
+
+        # 设置窗口图标
+        icon_path = get_asset_path('icon3.png')
+        if os.path.exists(icon_path):
+            try:
+                icon = tk.PhotoImage(file=icon_path)
+                self.root.iconphoto(False, icon)
+            except Exception as e:
+                self.logger.warning(f"无法加载图标: {e}")
 
         # 窗口居中
         self._center_window()
 
-        # 禁止调整大小（可选）
-        # self.root.resizable(False, False)
+        # 设置背景图片
+        self._set_background()
+
+    def _set_background(self):
+        """设置背景图片"""
+        bg_path = get_asset_path('scree.png')
+        if os.path.exists(bg_path):
+            try:
+                self.bg_image = tk.PhotoImage(file=bg_path)
+                # 获取屏幕尺寸
+                screen_width = self.root.winfo_screenwidth()
+                screen_height = self.root.winfo_screenheight()
+                
+                # 创建背景标签
+                bg_label = tk.Label(self.root, image=self.bg_image)
+                bg_label.place(x=0, y=0, relwidth=1, relheight=1)
+                self.bg_label = bg_label
+            except Exception as e:
+                self.logger.warning(f"无法加载背景图片: {e}")
+                # 使用纯色背景
+                self.root.configure(bg='#2d2d2d')
 
     def _center_window(self):
         """窗口居中显示"""
@@ -69,20 +125,27 @@ class MainWindow:
 
     def _create_layout(self):
         """创建窗口布局"""
+        # 创建内容容器（覆盖在背景之上）
+        self.content_container = tk.Frame(self.root, bg='#1a1a2e')
+        self.content_container.place(relx=0, rely=0, relwidth=1, relheight=1)
+        
         # 主框架
-        self.main_frame = ttk.Frame(self.root)
-        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        self.main_frame = tk.Frame(self.content_container, bg='#1a1a2e')
+        self.main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=20)
+
+        # 顶部标题区域
+        self._create_header()
 
         # 顶部导航栏
-        self.nav_frame = ttk.Frame(self.main_frame)
-        self.nav_frame.pack(fill=tk.X, pady=(0, 10))
+        self.nav_frame = tk.Frame(self.main_frame, bg='#1a1a2e')
+        self.nav_frame.pack(fill=tk.X, pady=(10, 15))
 
         # 内容区域
-        self.content_frame = ttk.Frame(self.main_frame)
+        self.content_frame = tk.Frame(self.main_frame, bg='#1a1a2e')
         self.content_frame.pack(fill=tk.BOTH, expand=True)
 
         # 底部日志区域
-        self.log_frame = ttk.LabelFrame(self.main_frame, text="日志输出")
+        self.log_frame = tk.LabelFrame(self.main_frame, text="日志输出", fg='#ffffff', bg='#1a1a2e', font=('微软雅黑', 10))
         self.log_frame.pack(fill=tk.X, pady=(10, 0))
 
         # 日志文本框
@@ -90,12 +153,47 @@ class MainWindow:
             self.log_frame,
             height=8,
             wrap=tk.WORD,
-            state='disabled'
+            state='disabled',
+            bg='#16213e',
+            fg='#eaeaea',
+            font=('Consolas', 9)
         )
         self.log_text.pack(fill=tk.X, padx=5, pady=5)
 
         # 创建导航按钮
         self._create_navigation()
+
+    def _create_header(self):
+        """创建顶部标题"""
+        header_frame = tk.Frame(self.main_frame, bg='#1a1a2e')
+        header_frame.pack(fill=tk.X)
+        
+        # 加载标题图片
+        header_img_path = get_asset_path('002.png')
+        if os.path.exists(header_img_path):
+            try:
+                self.header_image = tk.PhotoImage(file=header_img_path)
+                header_label = tk.Label(header_frame, image=self.header_image, bg='#1a1a2e')
+                header_label.pack(pady=(0, 10))
+            except Exception as e:
+                # 图片加载失败，使用文字标题
+                title_label = tk.Label(
+                    header_frame,
+                    text="OpenClaw 安装工具",
+                    font=('微软雅黑', 24, 'bold'),
+                    fg='#00d9ff',
+                    bg='#1a1a2e'
+                )
+                title_label.pack(pady=(0, 10))
+        else:
+            title_label = tk.Label(
+                header_frame,
+                text="OpenClaw 安装工具",
+                font=('微软雅黑', 24, 'bold'),
+                fg='#00d9ff',
+                bg='#1a1a2e'
+            )
+            title_label.pack(pady=(0, 10))
 
     def _create_navigation(self):
         """创建导航按钮"""
@@ -108,16 +206,26 @@ class MainWindow:
 
         self.nav_buttons = {}
 
+        # 创建按钮样式
+        style = ttk.Style()
+        style.configure('Nav.TButton', font=('微软雅黑', 12), padding=10)
+        
         # 创建按钮
         for i, (text, name, command) in enumerate(nav_buttons):
-            btn = ttk.Button(
+            btn = tk.Button(
                 self.nav_frame,
                 text=text,
                 command=command,
-                width=15
+                width=12,
+                font=('微软雅黑', 12, 'bold'),
+                bg='#0f3460',
+                fg='#ffffff',
+                activebackground='#00d9ff',
+                activeforeground='#000000',
+                relief='flat',
+                cursor='hand2'
             )
-            btn.pack(side=tk.LEFT, padx=(0, 5))
-
+            btn.pack(side=tk.LEFT, padx=(0, 10))
             self.nav_buttons[name] = btn
 
         # 默认选中第一个按钮
@@ -144,20 +252,22 @@ class MainWindow:
         # 默认显示安装页面
         self._show_page("install")
 
-    def _create_install_page(self) -> ttk.Frame:
+    def _create_install_page(self):
         """创建安装页面"""
-        frame = ttk.Frame(self.content_frame)
+        frame = tk.Frame(self.content_frame, bg='#1a1a2e')
 
         # 标题
-        title_label = ttk.Label(
+        title_label = tk.Label(
             frame,
-            text="OpenClaw安装",
-            font=('Helvetica', 16, 'bold')
+            text="OpenClaw 安装",
+            font=('微软雅黑', 20, 'bold'),
+            fg='#00d9ff',
+            bg='#1a1a2e'
         )
         title_label.pack(pady=20)
 
         # 环境检查结果区域
-        env_frame = ttk.LabelFrame(frame, text="环境检查")
+        env_frame = tk.LabelFrame(frame, text="环境检查", fg='#ffffff', bg='#16213e', font=('微软雅黑', 11, 'bold'))
         env_frame.pack(fill=tk.X, padx=10, pady=10)
 
         # 环境检查结果显示
