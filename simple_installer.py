@@ -23,7 +23,7 @@ except ImportError:
     print("⚠️  Tkinter 未安装，请安装 Python 的 tkinter 模块")
 
 try:
-    from PIL import Image, ImageTk
+    from PIL import Image, ImageTk, ImageDraw
     HAS_PIL = True
 except ImportError:
     HAS_PIL = False
@@ -231,7 +231,70 @@ class OpenClawApp:
         self.terminal_output['xscrollcommand'] = h_scroll.set
 
     def load_sidebar_image(self):
-        """加载左侧侧边栏的美化图片 002.png"""
+        """加载左侧侧边栏的美化图片 002.png，并在上方添加对话悬框"""
+        # 杰西卡的说话内容
+        jessica_dialogues = [
+            "主人，欢迎回来！今天要做什么呢？🎀",
+            "OpenClaw 安装器已就绪，随时待命～",
+            "主人，有什么需要帮忙的吗？",
+            "今天也要加油哦！✨",
+            "安装过程会很顺利的，相信我～",
+            "主人，注意休息哦～ 🌟",
+            "需要任何帮助，随时叫我！",
+            "OpenClaw 超好用的，主人会喜欢的！",
+            "主人，准备好了吗？开始吧～",
+            "今天天气不错呢～ 🌸",
+            "主人，我一直在你身边～",
+            "让我帮你完成一切吧！✨",
+            "主人，你的每一步我都记在心里～",
+            "有我在，什么都不用担心！🎀"
+        ]
+
+        # 创建带有向下箭头的对话框
+        dialog_container = tk.Frame(self.left_sidebar, bg="#2a2a2a")
+        dialog_container.pack(side=tk.TOP, pady=0, padx=10)
+
+        # 对话框（使用 Canvas 绘制圆角和箭头）
+        dialog_canvas = tk.Canvas(dialog_container, width=240, height=62, bg="#2a2a2a", highlightthickness=0)
+        dialog_canvas.pack()
+
+        # 绘制带圆角的对话框背景
+        radius = 8
+        x1, y1, x2, y2 = 10, 5, 230, 45
+        # 使用多边形绘制圆角矩形
+        points = [
+            x1 + radius, y1,  # 左上
+            x2 - radius, y1,  # 右上
+            x2, y1 + radius,
+            x2, y2 - radius,
+            x2 - radius, y2,  # 右下
+            x1 + radius, y2,  # 左下
+            x1, y2 - radius,
+            x1, y1 + radius
+        ]
+        dialog_canvas.create_polygon(points, fill="white", outline="#cccccc", width=2, smooth=True)
+
+        # 绘制向下的小箭头（正立三角形）
+        # 顶点在最下面，两个底角在上面
+        dialog_canvas.create_polygon(
+            120, 62,  # 顶点（最下面，指向角色）
+            105, 45,  # 左上角（连接对话框）
+            135, 45,  # 右上角（连接对话框）
+            fill="white", outline="#cccccc", width=1
+        )
+
+        # 对话框文字
+        self.dialog_label = tk.Label(
+            dialog_canvas,
+            text="",
+            bg="white",
+            fg="#333333",
+            font=('Helvetica', 10),
+            wraplength=210,
+            justify="left"
+        )
+        self.dialog_label.place(x=20, y=25)
+
         img_path = get_asset_path(os.path.join('image', '002.png'))
         if not os.path.exists(img_path):
             # 图片不存在，显示一个占位文本
@@ -242,18 +305,25 @@ class OpenClawApp:
         if HAS_PIL:
             try:
                 # 使用 Pillow 加载并等比例缩放图片以适应侧边栏高度
-                pil_img = Image.open(img_path)
-                
+                pil_img = Image.open(img_path).convert('RGBA')
+
                 # 调整图片大小策略：保持比例，宽度填满 280，或者高度自适应
                 # 在窗口大小改变时动态缩放比较复杂，这里我们先缩放一个适合初始高度(约750)的固定大小
                 target_w = 280
                 w_percent = (target_w / float(pil_img.size[0]))
                 target_h = int((float(pil_img.size[1]) * float(w_percent)))
-                
+
                 # 如果图片缩放后高度大于窗口初始高度，可以裁剪或者进一步缩小。
                 # 由于这是立绘角色图，我们这里仅等宽缩放。如果下面超出了会被 Frame 切掉。
                 pil_img = pil_img.resize((target_w, target_h), Image.LANCZOS)
-                
+
+                # 给图片添加圆角效果
+                corner_radius = 20
+                mask = Image.new('L', (target_w, target_h), 0)
+                draw = ImageDraw.Draw(mask)
+                draw.rounded_rectangle([(0, 0), (target_w, target_h)], corner_radius, fill=255)
+                pil_img.putalpha(mask)
+
                 self.sidebar_photo = ImageTk.PhotoImage(pil_img)
                 lbl = tk.Label(self.left_sidebar, image=self.sidebar_photo, bg="#2a2a2a")
                 lbl.pack(fill=tk.BOTH, expand=True)
@@ -267,6 +337,30 @@ class OpenClawApp:
                 lbl.pack(fill=tk.BOTH, expand=True)
             except Exception as e:
                 print(f"⚠️  基础组件加载图片失败: {e}")
+
+        # 打字机效果函数
+        def typewriter_effect(text, label, delay=100):
+            """逐字显示文字的打字机效果"""
+            label.config(text="")
+            def show_char(index):
+                if index < len(text):
+                    label.config(text=text[:index+1])
+                    self.root.after(delay, lambda: show_char(index+1))
+            show_char(0)
+
+        # 启动随机对话定时器（偶尔说话，间隔更长）
+        import random
+        def update_dialogue():
+            if hasattr(self, 'dialog_label'):
+                dialogue = random.choice(jessica_dialogues)
+                # 使用打字机效果
+                typewriter_effect(dialogue, self.dialog_label, delay=80)
+                # 随机间隔：15-45秒之间随机
+                next_interval = random.randint(15000, 45000)
+                self.root.after(next_interval, update_dialogue)
+
+        # 第一次延迟5秒开始播放
+        self.root.after(5000, update_dialogue)
 
     def build_layer1(self):
         """构建第一层：安装界面"""
@@ -289,47 +383,73 @@ class OpenClawApp:
         
         desc = ttk.Label(self.layer1_frame, text="为了保证稳定，请按顺序分别检查和安装：", font=('Helvetica', 12))
         desc.pack(pady=5)
-        
-        btn_frame = ttk.Frame(self.layer1_frame)
-        btn_frame.pack(pady=5)
-        
-        btn_style = {'ipadx': 10, 'ipady': 5, 'pady': 3, 'fill': tk.X}
-        
-        # 按钮顺序：每个命令行一个按钮
-        btn0 = ttk.Button(btn_frame, text="1. 检查环境 (查看是否已安装 Node.js 和 Git)", command=self.cmd_check_deps)
-        btn0.pack(**btn_style)
 
-        btn1 = ttk.Button(btn_frame, text="2. 安装 Node.js (使用 winget 静默安装)", command=self.cmd_install_node)
-        btn1.pack(**btn_style)
-        
-        btn2 = ttk.Button(btn_frame, text="3. 刷新环境变量 (需手动关闭CMD重开)", command=self.cmd_refresh_env)
-        btn2.pack(**btn_style)
-        
-        btn3 = ttk.Button(btn_frame, text="4. 安装 Git (若步骤1提示缺失则点击)", command=self.cmd_install_git)
-        btn3.pack(**btn_style)
-        
-        btn4 = ttk.Button(btn_frame, text="5. 安装 OpenClaw 核心 (npm install -g openclaw-cn)", command=self.cmd_install_openclaw)
-        btn4.pack(**btn_style)
-        
-        btn5 = ttk.Button(btn_frame, text="6. 测试安装 (查看 OpenClaw 版本)", command=self.cmd_test_openclaw)
-        btn5.pack(**btn_style)
+        # 三列按钮布局
+        btn_container = ttk.Frame(self.layer1_frame)
+        btn_container.pack(pady=5, fill=tk.X, expand=True)
 
-        # 第六步之后、第七步之前：生成 Gateway 配置模板
-        btn6_pre = ttk.Button(btn_frame, text="6.5 生成 Gateway 配置模板 (必须先执行)", command=self.cmd_gen_gateway_config)
-        btn6_pre.pack(**btn_style)
+        # 配置 ttk 样式
+        style = ttk.Style()
+        style.theme_use('clam')  # 使用更简单的主题
+        style.configure('Dark.TButton',
+                     background='#222222',
+                     foreground='white',
+                     font=('Helvetica', 10, 'bold'),
+                     borderwidth=3,
+                     relief='raised')
+        style.map('Dark.TButton',
+                 background=[('active', '#111111'), ('pressed', '#000000')],
+                 foreground=[('active', 'white'), ('pressed', 'white')])
 
-        btn6 = ttk.Button(btn_frame, text="7. 注册后台网关服务 (Gateway Install)", command=self.cmd_install_gateway)
-        btn6.pack(**btn_style)
-        
-        btn7 = ttk.Button(btn_frame, text="8. 启动 Gateway (Gateway Start)", command=self.cmd_start_gateway)
-        btn7.pack(**btn_style)
+        # 特殊按钮样式
+        style.configure('Green.TButton',
+                     background='#1a4d2e',
+                     foreground='white',
+                     font=('Helvetica', 10, 'bold'),
+                     borderwidth=3,
+                     relief='raised')
+        style.map('Green.TButton',
+                 background=[('active', '#0d3320'), ('pressed', '#0a2618')])
 
-        btn8 = ttk.Button(btn_frame, text="9. 进入控制台 (服务启停与配置) ➔", command=self.show_layer2)
-        btn8.pack(ipadx=10, ipady=5, pady=5, fill=tk.X)
+        style.configure('Orange.TButton',
+                     background='#5c3317',
+                     foreground='white',
+                     font=('Helvetica', 10, 'bold'),
+                     borderwidth=3,
+                     relief='raised')
+        style.map('Orange.TButton',
+                 background=[('active', '#3d2210'), ('pressed', '#2a170b')])
 
-        # 疑难解答按钮
-        btn9 = ttk.Button(btn_frame, text="❓ 疑难解答 (FAQ)", command=self.show_layer3)
-        btn9.pack(ipadx=10, ipady=5, pady=8, fill=tk.X)
+        # 定义按钮样式函数
+        def create_button(parent, text, command, style_name='Dark.TButton'):
+            """创建自定义样式的按钮，支持多行文本"""
+            btn = ttk.Button(parent, text=text, command=command, style=style_name)
+            btn.pack(fill=tk.X, pady=4, padx=2)
+            return btn
+
+        # 左列：安装环境
+        col1_frame = ttk.LabelFrame(btn_container, text="安装环境")
+        col1_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        create_button(col1_frame, "1. 检查环境", self.cmd_check_deps)
+        create_button(col1_frame, "2. 安装 Node.js\n(重启刷新变量)", self.cmd_install_node)
+        create_button(col1_frame, "3. 下载 Node.js\n(LTS长期支持版)", self.cmd_download_node)
+        create_button(col1_frame, "4. 安装 Git", self.cmd_install_git)
+
+        # 中列：安装 OpenClaw
+        col2_frame = ttk.LabelFrame(btn_container, text="安装 OpenClaw")
+        col2_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        create_button(col2_frame, "5. 安装 OpenClaw 核心", self.cmd_install_openclaw)
+        create_button(col2_frame, "6. 测试安装", self.cmd_test_openclaw)
+        create_button(col2_frame, "7. OpenClaw 初始配置\n(新终端窗口)", self.cmd_openclaw_init)
+
+        # 右列：配置环境
+        col3_frame = ttk.LabelFrame(btn_container, text="配置环境")
+        col3_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        create_button(col3_frame, "9. 进入控制台 ➔", self.show_layer2, 'Green.TButton')
+        create_button(col3_frame, "❓ 疑难解答 (FAQ)", self.show_layer3, 'Orange.TButton')
 
     def build_layer2(self):
         """构建第二层：控制与配置界面"""
@@ -914,6 +1034,40 @@ A: 如需更多帮助，您可以：
 
     def cmd_install_gateway(self):
         self.run_command_in_bg("注册后台网关服务", "openclaw gateway install")
+
+    def cmd_download_node(self):
+        """打开 Node.js LTS 下载页面"""
+        import webbrowser
+        node_lts_url = "https://nodejs.org/zh-cn/download"
+        webbrowser.open(node_lts_url)
+        self.log_terminal(f"\n📥 已打开 Node.js LTS 下载页面：{node_lts_url}\n")
+
+    def cmd_openclaw_init(self):
+        """在新终端窗口中运行 OpenClaw 初始配置"""
+        target_os = self.os_var.get()
+        self.log_terminal(f"\n[OpenClaw 初始配置] 目标系统: {target_os.upper()}\n")
+
+        if target_os == "windows":
+            # Windows: 打开新的 CMD 窗口运行 openclaw doctor
+            cmd = 'start cmd /k "echo OpenClaw 初始配置 && openclaw doctor"'
+            try:
+                subprocess.Popen(cmd, shell=True)
+                self.log_terminal("✅ 已在新终端窗口中打开 OpenClaw 配置工具\n")
+            except Exception as e:
+                self.log_terminal(f"❌ 打开新终端失败: {str(e)}\n")
+        else:
+            # macOS: 使用 osascript 打开新的 Terminal 窗口
+            script = '''
+            tell application "Terminal"
+                do script "echo 'OpenClaw 初始配置' && openclaw doctor"
+                activate
+            end tell
+            '''
+            try:
+                subprocess.run(['osascript', '-e', script])
+                self.log_terminal("✅ 已在新终端窗口中打开 OpenClaw 配置工具\n")
+            except Exception as e:
+                self.log_terminal(f"❌ 打开新终端失败: {str(e)}\n")
 
     def cmd_refresh_env(self):
         """刷新环境变量（Windows 提醒手动操作）"""
