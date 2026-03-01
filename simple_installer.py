@@ -210,10 +210,12 @@ class OpenClawApp:
         self.layer1_frame = ttk.Frame(self.view_container)
         self.layer2_frame = ttk.Frame(self.view_container)
         self.layer3_frame = ttk.Frame(self.view_container)
+        self.layer4_frame = ttk.Frame(self.view_container)
 
         self.build_layer1()
         self.build_layer2()
         self.build_layer3()
+        self.build_layer4()
 
         # 默认显示 Layer 1
         self.show_layer1()
@@ -250,12 +252,12 @@ class OpenClawApp:
             "有我在，什么都不用担心！🎀"
         ]
 
-        # 创建带有向下箭头的对话框
-        dialog_container = tk.Frame(self.left_sidebar, bg="#2a2a2a")
-        dialog_container.pack(side=tk.TOP, pady=0, padx=10)
+        # 🚀 修改点 1：将气泡改为绝对定位 (place)
+        self.dialog_container = tk.Frame(self.left_sidebar, bg="#2a2a2a")
+        self.dialog_container.place(x=20, y=120)  # y=120 决定了气泡的固定高度
 
         # 对话框（使用 Canvas 绘制圆角和箭头）
-        dialog_canvas = tk.Canvas(dialog_container, width=240, height=62, bg="#2a2a2a", highlightthickness=0)
+        dialog_canvas = tk.Canvas(self.dialog_container, width=240, height=62, bg="#2a2a2a", highlightthickness=0)
         dialog_canvas.pack()
 
         # 绘制带圆角的对话框背景
@@ -295,13 +297,14 @@ class OpenClawApp:
         )
         self.dialog_label.place(x=20, y=25)
 
+        # ========== 加载图片 ==========
         img_path = get_asset_path(os.path.join('image', '002.png'))
         if not os.path.exists(img_path):
             # 图片不存在，显示一个占位文本
             placeholder = tk.Label(self.left_sidebar, text="OpenClaw\nImage not found", fg="white", bg="#2a2a2a", font=('Helvetica', 14))
             placeholder.pack(expand=True)
             return
-            
+
         if HAS_PIL:
             try:
                 # 使用 Pillow 加载并等比例缩放图片以适应侧边栏高度
@@ -337,6 +340,30 @@ class OpenClawApp:
                 lbl.pack(fill=tk.BOTH, expand=True)
             except Exception as e:
                 print(f"⚠️  基础组件加载图片失败: {e}")
+
+        # 打字机效果函数
+        def typewriter_effect(text, label, delay=100):
+            """逐字显示文字的打字机效果"""
+            label.config(text="")
+            def show_char(index):
+                if index < len(text):
+                    label.config(text=text[:index+1])
+                    self.root.after(delay, lambda: show_char(index+1))
+            show_char(0)
+
+        # 启动随机对话定时器（偶尔说话，间隔更长）
+        import random
+        def update_dialogue():
+            if hasattr(self, 'dialog_label'):
+                dialogue = random.choice(jessica_dialogues)
+                # 使用打字机效果
+                typewriter_effect(dialogue, self.dialog_label, delay=80)
+                # 随机间隔：15-45秒之间随机
+                next_interval = random.randint(15000, 45000)
+                self.root.after(next_interval, update_dialogue)
+
+        # 第一次延迟5秒开始播放
+        self.root.after(5000, update_dialogue)
 
         # 打字机效果函数
         def typewriter_effect(text, label, delay=100):
@@ -450,6 +477,7 @@ class OpenClawApp:
 
         create_button(col3_frame, "9. 进入控制台 ➔", self.show_layer2, 'Green.TButton')
         create_button(col3_frame, "❓ 疑难解答 (FAQ)", self.show_layer3, 'Orange.TButton')
+        create_button(col3_frame, "🔮 邪修：Claude安装法", self.show_layer4, 'Purple.TButton')
 
     def build_layer2(self):
         """构建第二层：控制与配置界面"""
@@ -574,18 +602,28 @@ class OpenClawApp:
     def show_layer1(self):
         self.layer2_frame.pack_forget()
         self.layer3_frame.pack_forget()
+        self.layer4_frame.pack_forget()
         self.layer1_frame.pack(fill=tk.BOTH, expand=True)
 
     def show_layer2(self):
         self.layer1_frame.pack_forget()
         self.layer3_frame.pack_forget()
+        self.layer4_frame.pack_forget()
         self.layer2_frame.pack(fill=tk.BOTH, expand=True)
 
     def show_layer3(self):
         """显示疑难解答页面"""
         self.layer1_frame.pack_forget()
         self.layer2_frame.pack_forget()
+        self.layer4_frame.pack_forget()
         self.layer3_frame.pack(fill=tk.BOTH, expand=True)
+
+    def show_layer4(self):
+        """显示邪修：Claude安装法页面"""
+        self.layer1_frame.pack_forget()
+        self.layer2_frame.pack_forget()
+        self.layer3_frame.pack_forget()
+        self.layer4_frame.pack(fill=tk.BOTH, expand=True)
 
     def build_layer3(self):
         """构建第三层：疑难解答界面"""
@@ -919,7 +957,7 @@ A: 如需更多帮助，您可以：
             node -v
             """
         else:
-            cmd = "echo 正在通过 winget 静默安装 Node.js... & winget install OpenJS.NodeJS.LTS --source winget --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
+            cmd = "echo 正在通过 winget静默安装 Node.js... & winget install OpenJS.NodeJS.LTS --source winget --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
         self.run_command_in_bg("安装 Node.js", cmd)
 
     def cmd_install_git(self):
@@ -933,7 +971,7 @@ A: 如需更多帮助，您可以：
             git --version
             """
         else:
-            cmd = "echo 正在通过 winget 静默安装 Git... & winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
+            cmd = "echo 正在通过 winget静默安装 Git... & winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
         self.run_command_in_bg("安装 Git", cmd)
 
     def cmd_install_openclaw(self):
@@ -1034,6 +1072,111 @@ A: 如需更多帮助，您可以：
 
     def cmd_install_gateway(self):
         self.run_command_in_bg("注册后台网关服务", "openclaw gateway install")
+
+    def build_layer4(self):
+        """构建第四层：邪修：Claude安装法界面"""
+        # 顶部导航
+        nav_frame = ttk.Frame(self.layer4_frame)
+        nav_frame.pack(fill=tk.X, pady=5)
+        back_btn = ttk.Button(nav_frame, text="← 返回安装界面", command=self.show_layer1)
+        back_btn.pack(side=tk.LEFT)
+
+        lbl = ttk.Label(nav_frame, text="🔮 邪修：Claude安装法", font=('Helvetica', 16, 'bold'))
+        lbl.pack(side=tk.LEFT, padx=20)
+
+        # 说明区域
+        desc_frame = ttk.LabelFrame(self.layer4_frame, text="说明")
+        desc_frame.pack(fill=tk.X, padx=10, pady=10)
+
+        desc_label = ttk.Label(
+            desc_frame,
+            text="本方法先安装 Claude，配置模型后，直接使用自然语言安装 OpenClaw，比傻瓜还傻瓜。（Node.js 安装依然必须）",
+            font=('Helvetica', 11),
+            foreground="#0066cc",
+            wraplength=600
+        )
+        desc_label.pack(padx=15, pady=15)
+
+        # 按钮区域
+        btn_frame = ttk.Frame(self.layer4_frame)
+        btn_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
+
+        # 第一列：安装 Claude
+        col1_frame = ttk.LabelFrame(btn_frame, text="步骤1：安装 Claude")
+        col1_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        tk.Button(col1_frame, text="📦 安装 Claude", command=self.cmd_install_claude, bg="#404040", fg="white", font=('Helvetica', 11), height=2).pack(fill=tk.X, padx=10, pady=10)
+
+        ttk.Label(col1_frame, text="执行命令:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
+        cmd_label = ttk.Label(col1_frame, text="npm install -g @anthropic-ai/claude-code", font=('Consolas', 9), foreground="blue")
+        cmd_label.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # 第二列：安装 cc-switch
+        col2_frame = ttk.LabelFrame(btn_frame, text="步骤2：安装 cc-switch")
+        col2_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        tk.Button(col2_frame, text="🔄 安装 cc-switch (Mac)", command=self.cmd_install_ccswitch_mac, bg="#404040", fg="white", font=('Helvetica', 11)).pack(fill=tk.X, padx=10, pady=5)
+        tk.Button(col2_frame, text="🌐 打开下载页面 (Windows)", command=self.cmd_open_ccswitch_windows, bg="#404040", fg="white", font=('Helvetica', 11)).pack(fill=tk.X, padx=10, pady=5)
+
+        ttk.Label(col2_frame, text="⚠️ 重要:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
+        ttk.Label(col2_frame, text="安装后在 cc-switch 中给 Claude 配置大模型", font=('Helvetica', 9), foreground="red").pack(anchor="w", padx=10, pady=(0, 10))
+
+        # 第三列：启动和使用
+        col3_frame = ttk.LabelFrame(btn_frame, text="步骤3：启动和使用")
+        col3_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+
+        tk.Button(col3_frame, text="🚀 打开 Claude", command=self.cmd_open_claude, bg="#404040", fg="white", font=('Helvetica', 11), height=2).pack(fill=tk.X, padx=10, pady=10)
+
+        ttk.Label(col3_frame, text="💡 使用方法:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
+        usage_text = "打开 Claude 后，输入：\n\"帮我安装 openclaw，并且配置 xxxapikey，apikey：xxxxxx\""
+        ttk.Label(col3_frame, text=usage_text, font=('Helvetica', 9), foreground="green").pack(anchor="w", padx=10, pady=(0, 10))
+
+    def cmd_install_claude(self):
+        """安装 Claude"""
+        self.run_command_in_bg("安装 Claude", "npm install -g @anthropic-ai/claude-code")
+
+    def cmd_install_ccswitch_mac(self):
+        """安装 cc-switch (Mac)"""
+        commands = [
+            "brew tap farion1231/ccswitch",
+            "brew install --cask cc-switch",
+            "brew upgrade --cask cc-switch"
+        ]
+        self.log_terminal("\n[开始安装 cc-switch]\n")
+        for cmd in commands:
+            self.run_command_in_bg("安装 cc-switch", cmd)
+
+    def cmd_open_ccswitch_windows(self):
+        """打开 cc-switch Windows 下载页面"""
+        import webbrowser
+        url = "https://github.com/farion1231/cc-switch/releases"
+        webbrowser.open(url)
+        self.log_terminal(f"\n📥 已打开 cc-switch Windows 下载页面：{url}\n")
+
+    def cmd_open_claude(self):
+        """打开 Claude（在新终端窗口）"""
+        target_os = self.os_var.get()
+        self.log_terminal(f"\n[打开 Claude] 目标系统: {target_os.upper()}\n")
+
+        if target_os == "windows":
+            cmd = 'start cmd /k "claude"'
+            try:
+                subprocess.Popen(cmd, shell=True)
+                self.log_terminal("✅ 已在新终端窗口中打开 Claude\n")
+            except Exception as e:
+                self.log_terminal(f"❌ 打开新终端失败: {str(e)}\n")
+        else:
+            script = '''
+            tell application "Terminal"
+                do script "claude"
+                activate
+            end tell
+            '''
+            try:
+                subprocess.run(['osascript', '-e', script])
+                self.log_terminal("✅ 已在新终端窗口中打开 Claude\n")
+            except Exception as e:
+                self.log_terminal(f"❌ 打开新终端失败: {str(e)}\n")
 
     def cmd_download_node(self):
         """打开 Node.js LTS 下载页面"""
