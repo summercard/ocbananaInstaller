@@ -268,8 +268,22 @@ class OpenClawApp:
 
     def build_layer1(self):
         """构建第一层：安装界面"""
-        lbl = ttk.Label(self.layer1_frame, text="OpenClaw 傻瓜安装器", font=('Helvetica', 18, 'bold'))
-        lbl.pack(pady=10)
+        # 像素风格霓虹灯标题
+        title_frame = tk.Frame(self.layer1_frame, bg="#1a1a2e")
+        title_frame.pack(pady=10)
+        
+        # 霓虹灯标题文字
+        self.title_label = tk.Label(
+            title_frame,
+            text="◢◤ OpenClaw 傻瓜安装器 ◢◤",
+            font=("Courier New", 22, "bold"),
+            bg="#1a1a2e",
+            fg="#00ffaa"
+        )
+        self.title_label.pack()
+        
+        # 启动霓虹灯闪烁动画
+        self.neon_animation()
         
         desc = ttk.Label(self.layer1_frame, text="为了保证稳定，请按顺序分别检查和安装：", font=('Helvetica', 12))
         desc.pack(pady=5)
@@ -534,6 +548,29 @@ class OpenClawApp:
     def cmd_start_gateway(self):
         """启动 Gateway"""
         self.run_command_in_bg("启动 Gateway", "openclaw gateway start")
+
+    def neon_animation(self):
+        """像素风格霓虹灯闪烁动画"""
+        colors = ["#00ffaa", "#ff00ff", "#00ffff", "#ffff00", "#ff6600"]
+        current_idx = [0]
+        glow_phase = [0]
+        
+        def animate():
+            try:
+                phase = int(glow_phase[0]) % 3
+                if phase == 0:
+                    self.title_label.config(fg=colors[current_idx[0]], text="◢◤ OpenClaw 傻瓜安装器 ◢◤")
+                    glow_phase[0] += 1
+                elif phase == 1:
+                    glow_phase[0] += 1
+                else:
+                    self.title_label.config(fg="#004433", text="◢◤ OpenClaw 傻瓜安装器 ◢◤")
+                    current_idx[0] = (current_idx[0] + 1) % len(colors)
+                    glow_phase[0] = 0
+                self.title_label.after(500, animate)
+            except:
+                pass
+        animate()
 
     # ================= Layer 2 功能 =================
     def cmd_start_service(self):
