@@ -13,19 +13,28 @@
 1. 下载 `OpenClawInstaller-Windows-x64.exe`
 2. 双击运行
 3. 按顺序点击按钮：
-   - **检查依赖环境**：查看当前环境状态
-   - **安装 Node.js**：使用 winget 安装 Node.js
-   - **安装 OpenClaw**：使用 npm 安装 OpenClaw
+
+   **第一阶段：安装基础环境**
+   - **检查环境**：查看当前环境状态（Node.js、Git）
+   - **安装 Node.js**：使用 winget 静默安装 Node.js LTS
+   - **刷新环境变量**：安装 Node.js 后需手动关闭并重新打开 CMD
+   - **安装 Git**：使用 winget 安装 Git
+
+   **第二阶段：安装 OpenClaw 本体**
+   - **安装 OpenClaw 核心**：使用 npm 全局安装
+   - **测试安装**：验证 OpenClaw 版本
+
+   **第三阶段：配置与启动**
+   - **注册后台网关服务**：安装守护进程
+   - **启动 Gateway**：启动本地网关服务
+   - **进入控制台**：服务启停与 API 配置
 
 ### macOS
 
 1. 下载 `OpenClawInstaller-macOS-x64.zip`
 2. 解压缩
 3. 双击运行
-4. 按顺序点击按钮：
-   - **检查依赖环境**：查看当前环境状态
-   - **安装 Node.js**：使用 Homebrew 安装 Node.js
-   - **安装 OpenClaw**：使用 npm 安装 OpenClaw
+4. 按顺序点击按钮（同 Windows 步骤）
 
 ### Linux
 
