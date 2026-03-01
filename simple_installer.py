@@ -279,26 +279,33 @@ class OpenClawApp:
         
         btn_style = {'ipadx': 10, 'ipady': 5, 'pady': 3, 'fill': tk.X}
         
+        # 按钮顺序：每个命令行一个按钮
         btn0 = ttk.Button(btn_frame, text="1. 检查环境 (查看是否已安装 Node.js 和 Git)", command=self.cmd_check_deps)
         btn0.pack(**btn_style)
 
-        btn1 = ttk.Button(btn_frame, text="2. 安装 Node.js (若步骤1提示缺失则点击)", command=self.cmd_install_node)
+        btn1 = ttk.Button(btn_frame, text="2. 安装 Node.js (使用 winget 静默安装)", command=self.cmd_install_node)
         btn1.pack(**btn_style)
         
-        btn2 = ttk.Button(btn_frame, text="3. 安装 Git (若步骤1提示缺失则点击)", command=self.cmd_install_git)
+        btn2 = ttk.Button(btn_frame, text="3. 刷新环境变量 (需手动关闭CMD重开)", command=self.cmd_refresh_env)
         btn2.pack(**btn_style)
         
-        btn3 = ttk.Button(btn_frame, text="4. 安装 OpenClaw 核心", command=self.cmd_install_openclaw)
+        btn3 = ttk.Button(btn_frame, text="4. 安装 Git (若步骤1提示缺失则点击)", command=self.cmd_install_git)
         btn3.pack(**btn_style)
         
-        btn4 = ttk.Button(btn_frame, text="5. 测试安装 (查看 OpenClaw 版本)", command=self.cmd_test_openclaw)
+        btn4 = ttk.Button(btn_frame, text="5. 安装 OpenClaw 核心 (npm install -g openclaw-cn)", command=self.cmd_install_openclaw)
         btn4.pack(**btn_style)
         
-        btn5 = ttk.Button(btn_frame, text="6. 注册后台网关服务 (Gateway Install)", command=self.cmd_install_gateway)
+        btn5 = ttk.Button(btn_frame, text="6. 测试安装 (查看 OpenClaw 版本)", command=self.cmd_test_openclaw)
         btn5.pack(**btn_style)
         
-        btn6 = ttk.Button(btn_frame, text="7. 进入控制台 (服务启停与配置) ➔", command=self.show_layer2)
-        btn6.pack(ipadx=10, ipady=8, pady=8, fill=tk.X)
+        btn6 = ttk.Button(btn_frame, text="7. 注册后台网关服务 (Gateway Install)", command=self.cmd_install_gateway)
+        btn6.pack(**btn_style)
+        
+        btn7 = ttk.Button(btn_frame, text="8. 启动 Gateway (Gateway Start)", command=self.cmd_start_gateway)
+        btn7.pack(**btn_style)
+        
+        btn8 = ttk.Button(btn_frame, text="9. 进入控制台 (服务启停与配置) ➔", command=self.show_layer2)
+        btn8.pack(ipadx=10, ipady=8, pady=8, fill=tk.X)
 
     def build_layer2(self):
         """构建第二层：控制与配置界面"""
@@ -509,6 +516,24 @@ class OpenClawApp:
         
     def cmd_install_gateway(self):
         self.run_command_in_bg("注册后台网关服务", "openclaw gateway install")
+
+    def cmd_refresh_env(self):
+        """刷新环境变量（Windows 提醒手动操作）"""
+        target_os = self.os_var.get()
+        if target_os == "windows":
+            msg = "⚠️  重要提示：安装 Node.js 后，需要刷新环境变量\n\n" \
+                  "请执行以下操作：\n" \
+                  "1. 关闭当前 CMD 窗口\n" \
+                  "2. 重新以管理员身份打开一个新的 CMD 窗口\n" \
+                  "3. 在新窗口中验证：node --version\n\n" \
+                  "完成后继续下一步安装"
+            self.run_command_in_bg("刷新环境变量", f'echo "{msg}"')
+        else:
+            self.run_command_in_bg("刷新环境变量", 'echo "macOS/Linux 无需手动刷新环境变量"')
+
+    def cmd_start_gateway(self):
+        """启动 Gateway"""
+        self.run_command_in_bg("启动 Gateway", "openclaw gateway start")
 
     # ================= Layer 2 功能 =================
     def cmd_start_service(self):
