@@ -548,7 +548,7 @@ class OpenClawApp:
             node -v
             """
         else:
-            cmd = "echo 正在通过 winget 静默安装 Node.js... & winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
+            cmd = "echo 正在通过 winget 静默安装 Node.js... & winget install OpenJS.NodeJS.LTS --source winget --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
         self.run_command_in_bg("安装 Node.js", cmd)
 
     def cmd_install_git(self):
