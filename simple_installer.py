@@ -216,6 +216,16 @@ class OpenClawApp:
         # 默认显示 Layer 1
         self.show_layer1()
         
+        # 进度条区域
+        progress_frame = ttk.LabelFrame(self.right_workspace, text="安装进度")
+        progress_frame.pack(fill=tk.X, padx=10, pady=(0, 5))
+        
+        self.progress_bar = ttk.Progressbar(progress_frame, mode='determinate')
+        self.progress_bar.pack(fill=tk.X, padx=10, pady=5)
+        
+        self.progress_label = ttk.Label(progress_frame, text="等待执行...")
+        self.progress_label.pack(pady=(0, 5))
+        
         # 底部：终端输出区域
         terminal_frame = ttk.LabelFrame(self.right_workspace, text="终端输出 (后台执行日志)")
         terminal_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
@@ -473,6 +483,8 @@ class OpenClawApp:
                 else:
                     process = subprocess.Popen(['/bin/sh', '-c', command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
                 
+                import re
+                
                 for line in process.stdout:
                     # 手动解码，并忽略乱码错误
                     if current_os == "windows":
@@ -481,6 +493,10 @@ class OpenClawApp:
                         decoded_line = line.decode('utf-8', errors='replace')
                     
                     self.log_terminal(decoded_line)
+                    
+                    # ===== 进度条检测逻辑 =====
+                    self.update_progress(decoded_line)
+                    # ===== 进度条检测结束 =====
                     
                     # 状态指示灯监控逻辑 (简易版)
                     if "status" in command.lower() and hasattr(self, 'status_indicator'):
@@ -495,6 +511,11 @@ class OpenClawApp:
                 process.wait()
                 self.log_terminal(f"\n[执行完成] 返回码: {process.returncode}\n{'='*60}\n")
                 
+                # ===== 完成后重置进度条 =====
+                self.root.after(0, lambda: self.progress_bar.config(value=0))
+                self.root.after(0, lambda: self.progress_label.config(text="安装完成"))
+                # ===== 重置结束 =====
+                
                 # 如果刚才成功执行了 winget 安装 node 或 git，弹出重点提示
                 if current_os == "windows" and "winget install" in command and process.returncode == 0:
                     msg = "\n👉 【重要提示】: 系统依赖刚安装完毕！\n请**先关闭本安装器，然后再重新打开**，让系统重新加载环境变量。然后再进行下一步操作，否则系统会提示找不到命令！\n"
@@ -507,6 +528,53 @@ class OpenClawApp:
         thread = threading.Thread(target=task)
         thread.daemon = True
         thread.start()
+
+    def update_progress(self, line: str):
+        """根据输出行更新进度条"""
+        line_lower = line.lower()
+        
+        # 检测下载阶段开始
+        download_keywords = [
+            'downloading', 'fetching', 'installing', 
+            'downloading from', 'get ', 'received',
+            'npm install', 'brew install', 'winget install',
+            ' unpacking', 'extracting'
+        ]
+        
+        is_downloading = any(kw in line_lower for kw in download_keywords)
+        
+        if is_downloading:
+            self.root.after(0, lambda: self.progress_label.config(text="正在下载..."))
+            self.root.after(0, lambda: self.progress_bar.config(mode='indeterminate'))
+            self.root.after(0, lambda: self.progress_bar.start(10))
+        
+        # 解析百分比进度
+        # 模式1: 50%
+        percent_match = re.search(r'(\d+)%', line)
+        if percent_match:
+            percent = int(percent_match.group(1))
+            self.root.after(0, lambda: self.progress_bar.config(mode='determinate'))
+            self.root.after(0, lambda: self.progress_bar.stop())
+            self.root.after(0, lambda: self.progress_bar.config(value=percent))
+            self.root.after(0, lambda: self.progress_label.config(text=f"下载进度: {percent}%"))
+        
+        # 模式2: Downloading... 100.00 MB / 100.00 MB
+        progress_match = re.search(r'([\d.]+)\s*[mMgG][bB]\s*/\s*([\d.]+)\s*[mMgG][bB]', line, re.IGNORECASE)
+        if progress_match:
+            current = float(progress_match.group(1))
+            total = float(progress_match.group(2))
+            if total > 0:
+                percent = int((current / total) * 100)
+                self.root.after(0, lambda: self.progress_bar.config(mode='determinate'))
+                self.root.after(0, lambda: self.progress_bar.stop())
+                self.root.after(0, lambda: self.progress_bar.config(value=percent))
+                self.root.after(0, lambda: self.progress_label.config(text=f"下载进度: {percent}%"))
+        
+        # 检测安装完成
+        if 'done' in line_lower or 'completed' in line_lower or 'finished' in line_lower:
+            if 'error' not in line_lower and 'fail' not in line_lower:
+                self.root.after(0, lambda: self.progress_bar.stop())
+                self.root.after(0, lambda: self.progress_label.config(text="安装完成 ✓"))
 
     # ================= Layer 1 功能 (按系统区分命令) =================
     
@@ -528,7 +596,7 @@ class OpenClawApp:
             """
         else:
             # Windows 纯检查，将多行命令通过 && 串联，或者直接写成单行多语句
-            cmd = "echo ==== 检查 Windows 依赖环境 ==== & echo 1. 检查 Node.js: & node -v || echo [X] 未安装 Node.js & echo ------------------- & echo 2. 检查 Git: & git --version || echo [X] 未安装 Git & echo ==== 检查完毕 ===="
+            cmd = "echo ==== 检查 Windows 依赖环境 ==== & echo. & where node & echo. & node -v || echo [X] 未安装 Node.js & echo ------------------- & echo. & where git & echo. & git --version || echo [X] 未安装 Git & echo ==== 检查完毕 ===="
         self.run_command_in_bg("环境检查", cmd)
 
     def cmd_install_node(self):
@@ -548,7 +616,7 @@ class OpenClawApp:
             node -v
             """
         else:
-            cmd = "echo 正在通过 winget 静默安装 Node.js... & winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
+            cmd = "echo 正在通过 winget 静默安装 Node.js... & winget install OpenJS.NodeJS.LTS --silent --accept-source-agreements --accept-package-agreements & echo. & echo ==== 验证安装 ==== & where node & node -v & echo 安装执行结束。"
         self.run_command_in_bg("安装 Node.js", cmd)
 
     def cmd_install_git(self):
@@ -562,7 +630,7 @@ class OpenClawApp:
             git --version
             """
         else:
-            cmd = "echo 正在通过 winget 静默安装 Git... & winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
+            cmd = "echo 正在通过 winget 静默安装 Git... & winget install --id Git.Git -e --source winget --silent --accept-source-agreements --accept-package-agreements & echo. & echo ==== 验证安装 ==== & where git & git --version & echo 安装执行结束。"
         self.run_command_in_bg("安装 Git", cmd)
 
     def cmd_install_openclaw(self):
