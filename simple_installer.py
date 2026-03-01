@@ -1,665 +1,761 @@
 #!/usr/bin/env python3
 """
-OpenClaw 傻瓜安装与配置器
-- 增加 Mac / Win 系统切换开关
-- 第一层：安装系统依赖、安装 OpenClaw、打开 OpenClaw
-- 第二层：启停控制、配置 API 等
-- 核心逻辑：前端为 GUI，所有操作均拼接为针对特定系统的终端命令，发送至后台执行并实时回显日志
+OpenClaw 简易安装器 v2.2 - Windows 版
+===============================
+功能结构调整：
+- 第一阶段：安装基础环境（Node.js + 环境变量刷新）
+- 第二阶段：安装 OpenClaw 本体
+- 第三阶段：静默配置 API Key
+- 第四阶段：启动后台与对话
+
+每个阶段都有执行过程和判断
 """
 
 import subprocess
 import threading
 import sys
 import os
-import json
+import time
 
-# 尝试导入 tkinter
+# 尝试导入 tkinter（GUI 模式）
 try:
     import tkinter as tk
     from tkinter import ttk, scrolledtext, messagebox
     HAS_TKINTER = True
 except ImportError:
     HAS_TKINTER = False
-    print("⚠️  Tkinter 未安装，请安装 Python 的 tkinter 模块")
+    print("⚠️  Tkinter 未安装，使用终端模式")
+    print("安装命令：brew install python-tk@3.11")
 
+# 导入平台检测
 try:
-    from PIL import Image, ImageTk
-    HAS_PIL = True
+    from utils.platform import Platform
 except ImportError:
-    HAS_PIL = False
-    print("⚠️  Pillow 未安装，如需显示侧边图片，请安装 Pillow 模块 (pip install pillow)")
+    import platform
+    class Platform:
+        @staticmethod
+        def is_windows():
+            return platform.system() == 'Windows'
+        @staticmethod
+        def is_macos():
+            return platform.system() == 'Darwin'
 
-# OpenClaw 标准配置模板 (基于原生 openclaw.json 结构)
-OPENCLAW_CONFIG_TEMPLATE = '''
-{
-  "meta": {
-    "lastTouchedVersion": "2026.2.25",
-    "lastTouchedAt": "2026-02-28T00:00:00.000Z"
-  },
-  "env": {
-    "MINIMAX_API_KEY": "{{MINIMAX_API_KEY}}",
-    "OPENAI_API_KEY": "{{OPENAI_API_KEY}}"
-  },
-  "models": {
-    "mode": "merge",
-    "providers": {
-      "minimax": {
-        "baseUrl": "https://api.minimax.chat/v1",
-        "apiKey": "${MINIMAX_API_KEY}",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "MiniMax-M2.1",
-            "name": "MiniMax M2.1",
-            "reasoning": false,
-            "input": ["text"],
-            "contextWindow": 200000,
-            "maxTokens": 8192
-          }
-        ]
-      },
-      "openai": {
-        "baseUrl": "https://api.openai.com/v1",
-        "apiKey": "${OPENAI_API_KEY}",
-        "api": "openai-completions",
-        "models": [
-          {
-            "id": "gpt-4o",
-            "name": "GPT-4o",
-            "reasoning": false,
-            "input": ["text", "image"],
-            "contextWindow": 128000,
-            "maxTokens": 4096
-          }
-        ]
-      }
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": {
-        "primary": "{{DEFAULT_MODEL}}"
-      },
-      "models": {
-        "minimax/MiniMax-M2.1": {},
-        "openai/gpt-4o": {}
-      },
-      "workspace": "{{WORKSPACE_PATH}}",
-      "compaction": {
-        "mode": "safeguard"
-      }
-    }
-  },
-  "commands": {
-    "native": "auto",
-    "nativeSkills": "auto",
-    "restart": true,
-    "ownerDisplay": "raw"
-  },
-  "gateway": {
-    "mode": "local",
-    "port": {{GATEWAY_PORT}},
-    "auth": {
-      "mode": "token",
-      "token": "{{GATEWAY_TOKEN}}"
-    }
-  },
-  "plugins": {
-    "entries": {}
-  }
-}
-'''
 
-# 平台检测
-import platform
-class Platform:
-    @staticmethod
-    def is_windows():
-        return platform.system() == 'Windows'
-    @staticmethod
-    def is_macos():
-        return platform.system() == 'Darwin'
-
-def get_asset_path(relative_path):
-    """获取资源文件的绝对路径（兼容 PyInstaller 打包环境）"""
-    if hasattr(sys, '_MEIPASS'):
-        # PyInstaller 打包后的临时目录
-        base_path = sys._MEIPASS
-    else:
-        # 开发环境目录
-        base_path = os.path.dirname(__file__)
-    return os.path.join(base_path, relative_path)
-
-class OpenClawApp:
-    def __init__(self, root: tk.Tk):
+class WindowsInstaller:
+    """Windows 安装器 v2.2"""
+    
+    def __init__(self, root: tk.Tk = None):
+        """初始化安装器"""
         self.root = root
-        self.root.title("OpenClaw 安装与配置台")
-        self.root.geometry("850x850")
-        self.root.minsize(900, 750)
-        self.center_window()
-        
-        # 尝试设置窗口图标
-        self.set_window_icon()
-        
-        # 配置文件路径 (修复为原生 OpenClaw 默认路径)
-        self.config_dir = os.path.join(os.path.expanduser("~"), ".openclaw")
-        self.config_file = os.path.join(self.config_dir, "openclaw.json")
-        
-        # 固定使用的 Gateway Token
-        self.gateway_token = "8ab524d343c8b93b99b3a0c5babcf4ab108a1b3cccb03fef"
-        
+        self.setup_window()
         self.create_ui()
-        self.load_config()
-
+        
+    def setup_window(self):
+        """设置窗口"""
+        if self.root:
+            self.root.title("OpenClaw 安装器 v2.2 - Windows")
+            self.root.geometry("900x700")
+            self.root.minsize(700, 500)
+            self.center_window()
+        
     def center_window(self):
-        self.root.update_idletasks()
-        w = self.root.winfo_width()
-        h = self.root.winfo_height()
-        sw = self.root.winfo_screenwidth()
-        sh = self.root.winfo_screenheight()
-        x = (sw - w) // 2
-        y = (sh - h) // 2
-        self.root.geometry(f"{w}x{h}+{x}+{y}")
-
-    def set_window_icon(self):
-        """尝试设置窗口左上角的软件图标"""
-        icon_path = get_asset_path(os.path.join('image', 'icon.png'))
-        if os.path.exists(icon_path):
-            try:
-                # Tkinter 的 iconphoto 需要 PhotoImage 格式
-                img = tk.PhotoImage(file=icon_path)
-                self.root.iconphoto(True, img)
-            except Exception as e:
-                print(f"⚠️  设置图标失败: {e}")
-
+        """窗口居中"""
+        if self.root:
+            self.root.update_idletasks()
+            width = self.root.winfo_width()
+            height = self.root.winfo_height()
+            screen_width = self.root.winfo_screenwidth()
+            screen_height = self.root.winfo_screenheight()
+            x = (screen_width - width) // 2
+            y = (screen_height - height) // 2
+            self.root.geometry(f"{width}x{height}+{x}+{y}")
+            
     def create_ui(self):
-        # 整体分左右两栏结构：左边是图片侧边栏，右边是原本的主工作区
-        self.main_container = ttk.Frame(self.root)
-        self.main_container.pack(fill=tk.BOTH, expand=True)
-        
-        # ====== 左侧：图片区域 ======
-        self.left_sidebar = tk.Frame(self.main_container, width=280, bg="#2a2a2a")
-        self.left_sidebar.pack(side=tk.LEFT, fill=tk.Y)
-        self.left_sidebar.pack_propagate(False) # 强制保持固定宽度
-        
-        self.load_sidebar_image()
-        
-        # ====== 右侧：原本的业务区域 ======
-        self.right_workspace = ttk.Frame(self.main_container)
-        self.right_workspace.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        # 顶部：环境与网络设置 (放在右侧工作区)
-        env_frame = ttk.LabelFrame(self.right_workspace, text="环境与网络设置 (命令将据此生成)")
-        env_frame.pack(fill=tk.X, padx=10, pady=(10, 0))
-        
-        # 默认选中当前真实系统
-        default_os = "windows" if Platform.is_windows() else "macos"
-        self.os_var = tk.StringVar(value=default_os)
-        
-        ttk.Radiobutton(env_frame, text="Windows 系统", variable=self.os_var, value="windows").pack(side=tk.LEFT, padx=15, pady=5)
-        ttk.Radiobutton(env_frame, text="macOS / Linux 系统", variable=self.os_var, value="macos").pack(side=tk.LEFT, padx=15, pady=5)
-
-        # 镜像加速选择
-        self.use_mirror_var = tk.BooleanVar(value=True)  # 默认勾选国内镜像
-        ttk.Checkbutton(env_frame, text="使用国内镜像加速 (推荐)", variable=self.use_mirror_var).pack(side=tk.RIGHT, padx=20, pady=5)
-
-        # 视图区域 (通过 tk.Frame 切换 Layer 1 和 Layer 2)
-        self.view_container = ttk.Frame(self.right_workspace)
-        self.view_container.pack(fill=tk.X, padx=10, pady=10)
-        
-        self.layer1_frame = ttk.Frame(self.view_container)
-        self.layer2_frame = ttk.Frame(self.view_container)
-        
-        self.build_layer1()
-        self.build_layer2()
-        
-        # 默认显示 Layer 1
-        self.show_layer1()
-        
-        # 底部：终端输出区域
-        terminal_frame = ttk.LabelFrame(self.right_workspace, text="终端输出 (后台执行日志)")
-        terminal_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        self.terminal_output = scrolledtext.ScrolledText(
-            terminal_frame, wrap=tk.NONE, font=('Consolas', 10), bg="#1e1e1e", fg="#00ff00"
-        )
-        self.terminal_output.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-        
-        h_scroll = ttk.Scrollbar(self.terminal_output, orient=tk.HORIZONTAL, command=self.terminal_output.xview)
-        self.terminal_output['xscrollcommand'] = h_scroll.set
-
-    def load_sidebar_image(self):
-        """加载左侧侧边栏的美化图片 002.png"""
-        img_path = get_asset_path(os.path.join('image', '002.png'))
-        if not os.path.exists(img_path):
-            # 图片不存在，显示一个占位文本
-            placeholder = tk.Label(self.left_sidebar, text="OpenClaw\nImage not found", fg="white", bg="#2a2a2a", font=('Helvetica', 14))
-            placeholder.pack(expand=True)
+        """创建 UI"""
+        if not self.root:
             return
             
-        if HAS_PIL:
-            try:
-                # 使用 Pillow 加载并等比例缩放图片以适应侧边栏高度
-                pil_img = Image.open(img_path)
-                
-                # 调整图片大小策略：保持比例，宽度填满 280，或者高度自适应
-                # 在窗口大小改变时动态缩放比较复杂，这里我们先缩放一个适合初始高度(约750)的固定大小
-                target_w = 280
-                w_percent = (target_w / float(pil_img.size[0]))
-                target_h = int((float(pil_img.size[1]) * float(w_percent)))
-                
-                # 如果图片缩放后高度大于窗口初始高度，可以裁剪或者进一步缩小。
-                # 由于这是立绘角色图，我们这里仅等宽缩放。如果下面超出了会被 Frame 切掉。
-                pil_img = pil_img.resize((target_w, target_h), Image.LANCZOS)
-                
-                self.sidebar_photo = ImageTk.PhotoImage(pil_img)
-                lbl = tk.Label(self.left_sidebar, image=self.sidebar_photo, bg="#2a2a2a")
-                lbl.pack(fill=tk.BOTH, expand=True)
-            except Exception as e:
-                print(f"⚠️  加载侧边栏图片失败: {e}")
-        else:
-            try:
-                # 没有 PIL，只能尝试用 tk.PhotoImage 直接加载 (仅支持 PNG/GIF, 不支持缩放)
-                self.sidebar_photo = tk.PhotoImage(file=img_path)
-                lbl = tk.Label(self.left_sidebar, image=self.sidebar_photo, bg="#2a2a2a")
-                lbl.pack(fill=tk.BOTH, expand=True)
-            except Exception as e:
-                print(f"⚠️  基础组件加载图片失败: {e}")
-
-    def build_layer1(self):
-        """构建第一层：安装界面"""
-        lbl = ttk.Label(self.layer1_frame, text="OpenClaw 傻瓜安装器", font=('Helvetica', 18, 'bold'))
-        lbl.pack(pady=10)
+        # 主框架
+        main_frame = ttk.Frame(self.root)
+        main_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
         
-        desc = ttk.Label(self.layer1_frame, text="为了保证稳定，请按顺序分别检查和安装：", font=('Helvetica', 12))
-        desc.pack(pady=5)
+        # 标题
+        title_label = ttk.Label(
+            main_frame,
+            text="OpenClaw 安装器 v2.2",
+            font=('Helvetica', 16, 'bold')
+        )
+        title_label.pack(pady=(0, 10))
         
-        btn_frame = ttk.Frame(self.layer1_frame)
-        btn_frame.pack(pady=5)
+        # 副标题
+        subtitle_label = ttk.Label(
+            main_frame,
+            text="Windows 版 - 分阶段安装",
+            font=('Helvetica', 10)
+        )
+        subtitle_label.pack(pady=(0, 15))
         
-        btn_style = {'ipadx': 10, 'ipady': 5, 'pady': 3, 'fill': tk.X}
+        # 安装阶段按钮框架
+        self.stages_frame = ttk.LabelFrame(main_frame, text="安装阶段")
+        self.stages_frame.pack(fill=tk.X, pady=(0, 10))
         
-        btn0 = ttk.Button(btn_frame, text="1. 检查环境 (查看是否已安装 Node.js 和 Git)", command=self.cmd_check_deps)
-        btn0.pack(**btn_style)
-
-        btn1 = ttk.Button(btn_frame, text="2. 安装 Node.js (若步骤1提示缺失则点击)", command=self.cmd_install_node)
-        btn1.pack(**btn_style)
+        # 四个阶段的按钮
+        btn_frame = ttk.Frame(self.stages_frame)
+        btn_frame.pack(padx=10, pady=10)
         
-        btn2 = ttk.Button(btn_frame, text="3. 安装 Git (若步骤1提示缺失则点击)", command=self.cmd_install_git)
-        btn2.pack(**btn_style)
+        # 第一阶段按钮
+        self.stage1_btn = ttk.Button(
+            btn_frame,
+            text="第一阶段\n安装基础环境",
+            command=self.start_stage1,
+            width=18
+        )
+        self.stage1_btn.grid(row=0, column=0, padx=5, pady=5)
         
-        btn3 = ttk.Button(btn_frame, text="4. 安装 OpenClaw 核心", command=self.cmd_install_openclaw)
-        btn3.pack(**btn_style)
+        # 第二阶段按钮
+        self.stage2_btn = ttk.Button(
+            btn_frame,
+            text="第二阶段\n安装 OpenClaw 本体",
+            command=self.start_stage2,
+            width=18,
+            state='disabled'
+        )
+        self.stage2_btn.grid(row=0, column=1, padx=5, pady=5)
         
-        btn4 = ttk.Button(btn_frame, text="5. 测试安装 (查看 OpenClaw 版本)", command=self.cmd_test_openclaw)
-        btn4.pack(**btn_style)
+        # 第三阶段按钮
+        self.stage3_btn = ttk.Button(
+            btn_frame,
+            text="第三阶段\n配置 API Key",
+            command=self.start_stage3,
+            width=18,
+            state='disabled'
+        )
+        self.stage3_btn.grid(row=1, column=0, padx=5, pady=5)
         
-        btn5 = ttk.Button(btn_frame, text="6. 注册后台网关服务 (Gateway Install)", command=self.cmd_install_gateway)
-        btn5.pack(**btn_style)
+        # 第四阶段按钮
+        self.stage4_btn = ttk.Button(
+            btn_frame,
+            text="第四阶段\n启动与对话",
+            command=self.start_stage4,
+            width=18,
+            state='disabled'
+        )
+        self.stage4_btn.grid(row=1, column=1, padx=5, pady=5)
         
-        btn6 = ttk.Button(btn_frame, text="7. 进入控制台 (服务启停与配置) ➔", command=self.show_layer2)
-        btn6.pack(ipadx=10, ipady=8, pady=8, fill=tk.X)
-
-    def build_layer2(self):
-        """构建第二层：控制与配置界面"""
-        # 顶部导航
-        nav_frame = ttk.Frame(self.layer2_frame)
-        nav_frame.pack(fill=tk.X, pady=5)
-        back_btn = ttk.Button(nav_frame, text="← 返回安装界面", command=self.show_layer1)
-        back_btn.pack(side=tk.LEFT)
+        # 当前状态显示
+        self.status_label = ttk.Label(
+            main_frame,
+            text="当前状态：等待开始",
+            font=('Helvetica', 10)
+        )
+        self.status_label.pack(pady=(0, 5))
         
-        lbl = ttk.Label(nav_frame, text="OpenClaw 控制台", font=('Helvetica', 16, 'bold'))
-        lbl.pack(side=tk.LEFT, padx=20)
+        # 进度条
+        self.progress = ttk.Progressbar(
+            main_frame,
+            mode='determinate',
+            length=300
+        )
+        self.progress.pack(pady=(0, 10))
         
-        # 左右分栏：左侧服务控制，右侧API配置
-        content_frame = ttk.Frame(self.layer2_frame)
-        content_frame.pack(fill=tk.X, pady=10)
+        # 终端输出
+        terminal_frame = ttk.LabelFrame(main_frame, text="执行输出")
+        terminal_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
         
-        # 左侧：服务控制
-        ctrl_frame = ttk.LabelFrame(content_frame, text="服务控制")
-        ctrl_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 5))
+        self.output_text = scrolledtext.ScrolledText(
+            terminal_frame,
+            height=20,
+            wrap=tk.WORD,
+            state='disabled',
+            font=('Consolas', 9)
+        )
+        self.output_text.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
         
-        # 状态指示灯区域
-        status_frame = ttk.Frame(ctrl_frame)
-        status_frame.pack(fill=tk.X, padx=10, pady=5)
-        ttk.Label(status_frame, text="当前服务状态:", font=('Helvetica', 10, 'bold')).pack(side=tk.LEFT)
-        self.status_indicator = ttk.Label(status_frame, text="⚫ 未知", font=('Helvetica', 10, 'bold'), foreground="gray")
-        self.status_indicator.pack(side=tk.LEFT, padx=10)
+        # 底部说明
+        info_frame = ttk.LabelFrame(main_frame, text="操作说明")
+        info_frame.pack(fill=tk.X)
         
-        ttk.Button(ctrl_frame, text="▶ 启动服务 (Gateway Start)", command=self.cmd_start_service).pack(fill=tk.X, padx=10, pady=5)
-        ttk.Button(ctrl_frame, text="■ 停止服务 (Gateway Stop)", command=self.cmd_stop_service).pack(fill=tk.X, padx=10, pady=5)
-        ttk.Button(ctrl_frame, text="ℹ 查看状态 (刷新指示灯)", command=self.cmd_check_status).pack(fill=tk.X, padx=10, pady=5)
-        ttk.Button(ctrl_frame, text="🌐 打开 Web UI (浏览器)", command=self.cmd_open_webui).pack(fill=tk.X, padx=10, pady=5)
-
-        # 右侧：API 配置
-        cfg_frame = ttk.LabelFrame(content_frame, text="API 配置 (原生 openclaw.json)")
-        cfg_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        info_text = """
+        安装顺序：按阶段顺序执行（1 → 2 → 3 → 4）
+        每个阶段执行后会有判断，通过后才能进行下一阶段
+        如需重新开始，请关闭程序后重新启动
+        """
+        info_label = ttk.Label(info_frame, text=info_text, justify=tk.LEFT)
+        info_label.pack(padx=10, pady=5)
         
-        # 表单字段
-        self.cfg_vars = {
-            'api_type': tk.StringVar(value='minimax'),
-            'api_url': tk.StringVar(value='https://api.minimax.chat/v1'),
-            'api_key': tk.StringVar(),
-            'model_name': tk.StringVar(value='MiniMax-M2.1'),
-            'port': tk.StringVar(value='18789')
-        }
+    # ==================== 输出日志相关 ====================
+    
+    def log_output(self, text: str):
+        """输出日志到界面"""
+        if self.root:
+            self.root.after(0, lambda: self._do_log(text))
+    
+    def _do_log(self, text: str):
+        """实际执行日志写入"""
+        self.output_text.config(state='normal')
+        self.output_text.insert(tk.END, text)
+        self.output_text.see(tk.END)
+        self.output_text.config(state='disabled')
+    
+    def clear_output(self):
+        """清空输出"""
+        if self.root:
+            self.output_text.config(state='normal')
+            self.output_text.delete(1.0, tk.END)
+            self.output_text.config(state='disabled')
+    
+    def update_status(self, text: str):
+        """更新状态"""
+        if self.root:
+            self.root.after(0, lambda: self.status_label.config(text=text))
+    
+    def update_progress(self, value: float):
+        """更新进度条"""
+        if self.root:
+            self.root.after(0, lambda: self.progress.config(value=value))
+    
+    # ==================== 命令执行相关 ====================
+    
+    def run_command(self, cmd: str, shell: bool = True) -> tuple:
+        """执行命令并返回 (returncode, stdout, stderr)"""
+        self.log_output(f"\n$ {cmd}\n")
+        self.log_output("-" * 50 + "\n")
         
-        fields = [
-            ("API 服务商:", 'api_type'),
-            ("API URL:", 'api_url'),
-            ("API Key:", 'api_key'),
-            ("模型名称:", 'model_name'),
-            ("服务端口:", 'port')
-        ]
-        
-        for idx, (label_text, var_name) in enumerate(fields):
-            f = ttk.Frame(cfg_frame)
-            f.pack(fill=tk.X, padx=10, pady=3)
-            ttk.Label(f, text=label_text, width=12).pack(side=tk.LEFT)
-            if var_name == 'api_type':
-                cb = ttk.Combobox(f, textvariable=self.cfg_vars[var_name], values=['minimax', 'openai', 'custom'])
-                cb.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            elif var_name == 'api_key':
-                ttk.Entry(f, textvariable=self.cfg_vars[var_name], show="*").pack(side=tk.LEFT, fill=tk.X, expand=True)
+        try:
+            if shell:
+                process = subprocess.Popen(
+                    cmd,
+                    shell=True,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
             else:
-                ttk.Entry(f, textvariable=self.cfg_vars[var_name]).pack(side=tk.LEFT, fill=tk.X, expand=True)
-                
-        ttk.Button(cfg_frame, text="💾 保存并应用配置", command=self.cmd_save_config).pack(pady=10)
-
-    def show_layer1(self):
-        self.layer2_frame.pack_forget()
-        self.layer1_frame.pack(fill=tk.BOTH, expand=True)
-
-    def show_layer2(self):
-        self.layer1_frame.pack_forget()
-        self.layer2_frame.pack(fill=tk.BOTH, expand=True)
-
-    # =================终端命令执行核心=================
-    def log_terminal(self, text):
-        self.root.after(0, lambda: self.terminal_output.insert(tk.END, text))
-        self.root.after(0, lambda: self.terminal_output.see(tk.END))
-
-    def run_command_in_bg(self, cmd_desc, command):
-        """后台运行终端命令并实时输出"""
-        current_os = self.os_var.get()
-        self.log_terminal(f"\n[{cmd_desc}] 目标系统: {current_os.upper()} | 执行命令:\n> {command}\n{'-'*60}\n")
+                process = subprocess.Popen(
+                    cmd.split(),
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1
+                )
+            
+            output_lines = []
+            for line in process.stdout:
+                self.log_output(line)
+                output_lines.append(line)
+            
+            process.wait()
+            output = "".join(output_lines)
+            
+            self.log_output("-" * 50 + "\n")
+            self.log_output(f"返回码: {process.returncode}\n\n")
+            
+            return process.returncode, output, ""
+            
+        except Exception as e:
+            self.log_output(f"✗ 执行失败: {e}\n")
+            return -1, "", str(e)
+    
+    def check_command(self, cmd: str) -> bool:
+        """检查命令是否成功执行"""
+        returncode, stdout, stderr = self.run_command(cmd)
+        return returncode == 0
+    
+    # ==================== 第一阶段：安装基础环境 ====================
+    
+    def start_stage1(self):
+        """开始第一阶段安装"""
+        self.clear_output()
+        self.update_status("第一阶段：安装基础环境")
+        self.update_progress(10)
+        self.stage1_btn.config(state='disabled')
         
-        def task():
-            try:
-                # 根据当前选择的 OS 切换 Shell 执行器
-                if current_os == "windows":
-                    creationflags = subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-                    # 去掉 text=True，改用二进制读取以手动处理编码错误
-                    process = subprocess.Popen(['cmd.exe', '/c', command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, creationflags=creationflags)
-                else:
-                    process = subprocess.Popen(['/bin/sh', '-c', command], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-                
-                for line in process.stdout:
-                    # 手动解码，并忽略乱码错误
-                    if current_os == "windows":
-                        decoded_line = line.decode('gbk', errors='replace')
-                    else:
-                        decoded_line = line.decode('utf-8', errors='replace')
-                    
-                    self.log_terminal(decoded_line)
-                    
-                    # 状态指示灯监控逻辑 (简易版)
-                    if "status" in command.lower() and hasattr(self, 'status_indicator'):
-                        lower_line = decoded_line.lower()
-                        if "gateway service missing" in lower_line or "missing" in lower_line and "scheduled task" in lower_line:
-                            self.root.after(0, lambda: self.status_indicator.config(text="🔴 服务未安装/缺失", foreground="red"))
-                        elif "stopped" in lower_line or "not running" in lower_line:
-                            self.root.after(0, lambda: self.status_indicator.config(text="🟡 已停止", foreground="orange"))
-                        elif "running" in lower_line and "pid" in lower_line or "started" in lower_line:
-                            self.root.after(0, lambda: self.status_indicator.config(text="🟢 运行中", foreground="green"))
-                
-                process.wait()
-                self.log_terminal(f"\n[执行完成] 返回码: {process.returncode}\n{'='*60}\n")
-                
-                # 如果刚才成功执行了 winget 安装 node 或 git，弹出重点提示
-                if current_os == "windows" and "winget install" in command and process.returncode == 0:
-                    msg = "\n👉 【重要提示】: 系统依赖刚安装完毕！\n请**先关闭本安装器，然后再重新打开**，让系统重新加载环境变量。然后再进行下一步操作，否则系统会提示找不到命令！\n"
-                    self.log_terminal(msg)
-                    messagebox.showinfo("重启提示", "环境依赖安装成功！\n请关闭本软件并重新打开，以刷新环境变量，然后再进行下一步。")
-                    
-            except Exception as e:
-                self.log_terminal(f"\n[执行错误]: {str(e)}\n{'='*60}\n")
-
-        thread = threading.Thread(target=task)
+        thread = threading.Thread(target=self.run_stage1)
         thread.daemon = True
         thread.start()
-
-    # ================= Layer 1 功能 (按系统区分命令) =================
     
-    def cmd_check_deps(self):
-        """仅检查依赖，不自动安装"""
-        target_os = self.os_var.get()
-        if target_os == "macos":
-            cmd = """
-            echo "==== 检查 macOS 依赖环境 ===="
-            echo "1. 检查 Homebrew:"
-            brew --version || echo "❌ 未安装 Homebrew"
-            echo "-------------------"
-            echo "2. 检查 Node.js:"
-            node -v || echo "❌ 未安装 Node.js"
-            echo "-------------------"
-            echo "3. 检查 Git:"
-            git --version || echo "❌ 未安装 Git"
-            echo "==== 检查完毕 ===="
-            """
-        else:
-            # Windows 纯检查，将多行命令通过 && 串联，或者直接写成单行多语句
-            cmd = "echo ==== 检查 Windows 依赖环境 ==== & echo 1. 检查 Node.js: & node -v || echo [X] 未安装 Node.js & echo ------------------- & echo 2. 检查 Git: & git --version || echo [X] 未安装 Git & echo ==== 检查完毕 ===="
-        self.run_command_in_bg("环境检查", cmd)
-
-    def cmd_install_node(self):
-        """单独安装 Node.js"""
-        target_os = self.os_var.get()
-        use_mirror = self.use_mirror_var.get()
-        if target_os == "macos":
-            brew_install_cmd = 'export HOMEBREW_BREW_GIT_REMOTE="https://mirrors.tuna.tsinghua.edu.cn/git/homebrew/brew.git" && /bin/bash -c "$(curl -fsSL https://gitee.com/cunkai/HomebrewCN/raw/master/Homebrew.sh)"' if use_mirror else '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
-            cmd = f"""
-            echo "开始安装 Node.js..."
-            if ! command -v brew >/dev/null 2>&1; then
-                echo "未检测到 Homebrew，正在拉取安装脚本..."
-                {brew_install_cmd}
-            fi
-            brew install node
-            echo "安装完成，检查版本："
-            node -v
-            """
-        else:
-            cmd = "echo 正在通过 winget 静默安装 Node.js... & winget install OpenJS.NodeJS.LTS --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
-        self.run_command_in_bg("安装 Node.js", cmd)
-
-    def cmd_install_git(self):
-        """单独安装 Git"""
-        target_os = self.os_var.get()
-        if target_os == "macos":
-            cmd = """
-            echo "开始安装 Git..."
-            brew install git
-            echo "安装完成，检查版本："
-            git --version
-            """
-        else:
-            cmd = "echo 正在通过 winget 静默安装 Git... & winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
-        self.run_command_in_bg("安装 Git", cmd)
-
-    def cmd_install_openclaw(self):
-        # 根据是否选择镜像决定是否配置 npm registry
-        use_mirror = self.use_mirror_var.get()
-        target_os = self.os_var.get()
+    def run_stage1(self):
+        """执行第一阶段安装"""
+        self.log_output("=" * 60 + "\n")
+        self.log_output("第一阶段：安装基础环境")
+        self.log_output("=" * 60 + "\n\n")
         
-        if use_mirror:
-            if target_os == "windows":
-                cmd = "npm config set registry https://registry.npmmirror.com && npm install -g openclaw"
-            else:
-                cmd = "npm config set registry https://registry.npmmirror.com && npm install -g openclaw"
-        else:
-            if target_os == "windows":
-                cmd = "npm config delete registry && npm install -g openclaw"
-            else:
-                cmd = "npm config delete registry && npm install -g openclaw"
-                
-        self.run_command_in_bg("安装 OpenClaw", cmd)
-
-    def cmd_test_openclaw(self):
-        self.run_command_in_bg("测试安装", "openclaw --version")
+        # 1. 使用 winget 静默安装 Node.js LTS 版本
+        self.log_output("【步骤 1/2】使用 winget 安装 Node.js LTS\n")
+        self.log_output("执行命令: winget install OpenJS.NodeJS.LTS\n")
         
-    def cmd_install_gateway(self):
-        self.run_command_in_bg("注册后台网关服务", "openclaw gateway install")
-
-    # ================= Layer 2 功能 =================
-    def cmd_start_service(self):
-        # 先自动 check 状态，然后再启动
-        cmd = "openclaw gateway start && openclaw gateway status"
-        self.run_command_in_bg("启动服务", cmd)
-
-    def cmd_stop_service(self):
-        cmd = "openclaw gateway stop && openclaw gateway status"
-        self.run_command_in_bg("停止服务", cmd)
-
-    def cmd_check_status(self):
-        cmd = "openclaw gateway status && openclaw --version"
-        self.run_command_in_bg("查看状态", cmd)
-
-    def cmd_open_webui(self):
-        port = self.cfg_vars['port'].get() or "18789"
-        # 如果有保存的 token，自动带上免密登录
-        if hasattr(self, 'gateway_token') and self.gateway_token:
-            url = f"http://127.0.0.1:{port}/?token={self.gateway_token}"
-        else:
-            url = f"http://127.0.0.1:{port}/"
+        returncode, stdout, stderr = self.run_command(
+            'winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements'
+        )
         
-        target_os = self.os_var.get()
-        
-        if target_os == "windows":
-            cmd = f"start {url}"
+        if returncode == 0:
+            self.log_output("✓ Node.js 安装命令已执行\n")
         else:
-            cmd = f"open {url}"
+            self.log_output("✗ Node.js 安装失败，可能需要手动安装\n")
+            self.log_output("请访问 https://nodejs.org/ 下载并安装\n")
+        
+        # 2. 刷新环境变量（手动操作）- 需要提醒
+        self.log_output("\n【步骤 2/2】刷新环境变量\n")
+        self.log_output("=" * 60 + "\n")
+        self.log_output("⚠️  重要提示：安装完成后，请执行以下操作：\n\n")
+        self.log_output("1. 关闭当前 CMD 窗口\n")
+        self.log_output("2. 重新以管理员身份打开一个新的 CMD 窗口\n")
+        self.log_output("3. 在新窗口中验证 Node.js 安装：node --version\n\n")
+        
+        # 弹窗提醒
+        if self.root:
+            self.root.after(0, lambda: messagebox.showinfo(
+                "环境变量刷新",
+                "请关闭当前 CMD 窗口，\n然后重新以管理员身份打开一个新的 CMD 窗口，\n然后点击确定继续..."
+            ))
+        
+        # 检查 Node.js 是否可用
+        self.log_output("\n检查 Node.js 安装状态...\n")
+        returncode, stdout, stderr = self.run_command('node --version')
+        
+        if returncode == 0 and "v" in stdout:
+            self.log_output("✓ Node.js 已安装并生效\n")
+            self.stage2_btn.config(state='normal')
+            self.update_status("第一阶段完成 - 可进入第二阶段")
+            self.update_progress(25)
+        else:
+            self.log_output("✗ Node.js 尚未生效\n")
+            self.log_output("请确保已关闭并重新打开 CMD 窗口\n")
+            self.stage1_btn.config(state='normal')
+            self.update_status("等待环境变量刷新")
+    
+    # ==================== 第二阶段：安装 OpenClaw 本体 ====================
+    
+    def start_stage2(self):
+        """开始第二阶段安装"""
+        self.update_status("第二阶段：安装 OpenClaw 本体")
+        self.update_progress(40)
+        self.stage2_btn.config(state='disabled')
+        
+        thread = threading.Thread(target=self.run_stage2)
+        thread.daemon = True
+        thread.start()
+    
+    def run_stage2(self):
+        """执行第二阶段安装"""
+        self.log_output("=" * 60 + "\n")
+        self.log_output("第二阶段：安装 OpenClaw 本体")
+        self.log_output("=" * 60 + "\n\n")
+        
+        # 1. 检查环境版本
+        self.log_output("【步骤 1/2】检查环境版本\n")
+        
+        returncode, stdout, stderr = self.run_command('node --version')
+        
+        if returncode == 0:
+            version = stdout.strip()
+            self.log_output(f"Node.js 版本: {version}\n")
             
-        self.run_command_in_bg("打开 WebUI", cmd)
-
-    def cmd_save_config(self):
-        """保存并应用配置 (通过终端执行文件写入完整规范模板)"""
-        import secrets
-        
-        # 生成一个随机的 gateway token
-        gateway_token = secrets.hex(20)
-        
-        # 完整的、经过验证的 OpenClaw 标准配置模板
-        config_template = {
-            "meta": {
-                "lastTouchedVersion": "2026.2.25",
-                "lastTouchedAt": "2026-02-28T07:18:58.181Z"
-            },
-            "env": {
-                "MINIMAX_API_KEY": self.cfg_vars['api_key'].get() or "",
-                "GEMINI_API_KEY": ""
-            },
-            "wizard": {
-                "lastRunAt": "2026-02-28T07:18:58.159Z",
-                "lastRunVersion": "2026.2.25",
-                "lastRunCommand": "doctor",
-                "lastRunMode": "local"
-            },
-            "models": {
-                "mode": "merge",
-                "providers": {
-                    "minimax": {
-                        "baseUrl": self.cfg_vars['api_url'].get() or "https://api.minimax.chat/v1",
-                        "apiKey": "${MINIMAX_API_KEY}",
-                        "api": "openai-completions",
-                        "models": [
-                            {
-                                "id": self.cfg_vars['model_name'].get() or "MiniMax-M2.1",
-                                "name": self.cfg_vars['model_name'].get() or "MiniMax M2.1",
-                                "reasoning": False,
-                                "input": ["text"],
-                                "contextWindow": 200000,
-                                "maxTokens": 8192
-                            }
-                        ]
-                    }
-                }
-            },
-            "agents": {
-                "defaults": {
-                    "model": {
-                        "primary": f"minimax/{self.cfg_vars['model_name'].get() or 'MiniMax-M2.1'}"
-                    },
-                    "models": {
-                        f"minimax/{self.cfg_vars['model_name'].get() or 'MiniMax-M2.1'}": {}
-                    },
-                    "workspace": "~\\.openclaw\\workspace",
-                    "compaction": {
-                        "mode": "safeguard"
-                    }
-                }
-            },
-            "commands": {
-                "native": "auto",
-                "nativeSkills": "auto",
-                "restart": True,
-                "ownerDisplay": "raw"
-            },
-            "gateway": {
-                "mode": "local",
-                "port": int(self.cfg_vars['port'].get() or 18789),
-                "auth": {
-                    "mode": "token",
-                    "token": gateway_token
-                }
-            },
-            "plugins": {
-                "entries": {}
-            }
-        }
-        
-        json_str = json.dumps(config_template, ensure_ascii=False, indent=2)
-        target_os = self.os_var.get()
-
-        if target_os == "macos":
-            cmd = f"""
-mkdir -p ~/.openclaw
-cat << 'EOF' > ~/.openclaw/openclaw.json
-{json_str}
-EOF
-echo "✅ 完整规范配置已成功写入 ~/.openclaw/openclaw.json"
-            """.strip()
-        else:
-            config_dir_win = os.path.join(os.environ.get('USERPROFILE', 'C:\\'), '.openclaw')
-            config_file_win = os.path.join(config_dir_win, 'openclaw.json')
-            json_inline = json.dumps(config_template, ensure_ascii=False).replace("'", "\\'")
-            safe_dir = config_dir_win.replace('\\', '\\\\')
-            safe_file = config_file_win.replace('\\', '\\\\')
-            cmd = f"""
-python -c "import os, json; os.makedirs(r'{safe_dir}', exist_ok=True); f=open(r'{safe_file}', 'w', encoding='utf-8'); f.write('{json_inline}'); f.close(); print('✅ 完整规范配置已成功写入')"
-            """.strip()
-
-        self.run_command_in_bg("保存并应用配置", cmd)
-        
-        # 保存 token 到实例变量，供打开 WebUI 时使用
-        self.gateway_token = gateway_token
-        
-        messagebox.showinfo("成功", f"【{target_os.upper()}】完整规范配置已写入！\n\nGateway Token: {gateway_token}\n\n请点击启动服务后再打开 WebUI。")
-
-    def load_config(self):
-        """应用启动时，尝试本地读取一下配置填充到 GUI"""
-        if os.path.exists(self.config_file):
+            # 检查是否为 v22 或以上
             try:
-                with open(self.config_file, 'r', encoding='utf-8') as f:
-                    config_data = json.load(f)
-                    for key, var in self.cfg_vars.items():
-                        if key in config_data:
-                            var.set(str(config_data[key]))
-            except Exception as e:
-                print(f"读取配置失败: {e}")
+                major_version = int(version.replace("v", "").split(".")[0])
+                if major_version >= 22:
+                    self.log_output("✓ Node.js 版本符合要求 (v22+)\n")
+                else:
+                    self.log_output(f"✗ Node.js 版本过低，需要 v22 或更高\n")
+                    self.stage2_btn.config(state='normal')
+                    self.update_status("Node.js 版本过低")
+                    return
+            except:
+                self.log_output("⚠️  无法解析版本号，继续尝试安装\n")
+        else:
+            self.log_output("✗ Node.js 不可用，请先完成第一阶段\n")
+            self.stage2_btn.config(state='normal')
+            return
+        
+        # 2. 全局安装 OpenClaw
+        self.log_output("\n【步骤 2/2】全局安装 OpenClaw\n")
+        
+        returncode, stdout, stderr = self.run_command('npm install -g openclaw-cn')
+        
+        if returncode == 0:
+            self.log_output("✓ OpenClaw 安装成功\n")
+            self.stage3_btn.config(state='normal')
+            self.update_status("第二阶段完成 - 可进入第三阶段")
+            self.update_progress(55)
+        else:
+            self.log_output("✗ OpenClaw 安装失败\n")
+            self.stage2_btn.config(state='normal')
+            self.update_status("安装失败，请重试")
+    
+    # ==================== 第三阶段：静默配置 API Key ====================
+    
+    def start_stage3(self):
+        """开始第三阶段配置"""
+        self.update_status("第三阶段：配置 API Key")
+        self.update_progress(70)
+        
+        # 弹出对话框获取 API Key
+        if self.root:
+            dialog = APIKeyDialog(self.root)
+            self.root.wait_window(dialog.dialog)
+            
+            if dialog.api_key:
+                self.api_key = dialog.api_key
+                thread = threading.Thread(target=self.run_stage3)
+                thread.daemon = True
+                thread.start()
+            else:
+                self.update_status("等待输入 API Key")
+        else:
+            # 终端模式
+            self.api_key = input("请输入 API Key: ").strip()
+            if self.api_key:
+                thread = threading.Thread(target=self.run_stage3)
+                thread.daemon = True
+                thread.start()
+    
+    def run_stage3(self):
+        """执行第三阶段配置"""
+        self.log_output("=" * 60 + "\n")
+        self.log_output("第三阶段：静默配置 API Key")
+        self.log_output("=" * 60 + "\n\n")
+        
+        api_key = self.api_key
+        
+        # 1. 创建配置文件夹
+        self.log_output("【步骤 1/4】创建配置文件夹\n")
+        
+        config_dir = os.path.join(os.environ.get('APPDATA', ''), 'openclaw')
+        self.log_output(f"配置目录: {config_dir}\n")
+        
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+            self.log_output("✓ 配置文件夹已创建\n")
+        except Exception as e:
+            self.log_output(f"✗ 创建失败: {e}\n")
+            return
+        
+        # 2. 写入 API 密钥
+        self.log_output("\n【步骤 2/4】写入 API 密钥\n")
+        
+        config_file = os.path.join(config_dir, 'config.yaml')
+        
+        # 读取现有配置或创建新配置
+        config_content = ""
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    config_content = f.read()
+            except:
+                pass
+        
+        # 添加 API Key 配置
+        if 'apiKeys:' not in config_content:
+            config_content += "\napiKeys:\n  anthropic: " + api_key + "\n"
+        
+        try:
+            with open(config_file, 'w', encoding='utf-8') as f:
+                f.write(config_content)
+            self.log_output("✓ API 密钥已写入配置文件\n")
+        except Exception as e:
+            self.log_output(f"✗ 写入失败: {e}\n")
+            return
+        
+        # 3. 启用服务商
+        self.log_output("\n【步骤 3/4】启用服务商\n")
+        
+        returncode, stdout, stderr = self.run_command(
+            f'openclaw-cn config set providers.anthropic.enabled true'
+        )
+        
+        if returncode == 0:
+            self.log_output("✓ Anthropic 服务商已启用\n")
+        else:
+            self.log_output("⚠️  手动启用服务商\n")
+        
+        # 4. 设置默认模型
+        self.log_output("\n【步骤 4/4】设置默认模型\n")
+        
+        returncode, stdout, stderr = self.run_command(
+            'openclaw-cn config set defaultModel claude-sonnet-4-20250514'
+        )
+        
+        if returncode == 0:
+            self.log_output("✓ 默认模型已设置\n")
+        else:
+            self.log_output("⚠️  手动设置默认模型\n")
+        
+        self.log_output("\n✓ API Key 配置完成\n")
+        self.stage4_btn.config(state='normal')
+        self.update_status("第三阶段完成 - 可进入第四阶段")
+        self.update_progress(85)
+    
+    # ==================== 第四阶段：启动后台与对话 ====================
+    
+    def start_stage4(self):
+        """开始第四阶段启动"""
+        self.update_status("第四阶段：启动与对话")
+        self.stage4_btn.config(state='disabled')
+        
+        thread = threading.Thread(target=self.run_stage4)
+        thread.daemon = True
+        thread.start()
+    
+    def run_stage4(self):
+        """执行第四阶段启动"""
+        self.log_output("=" * 60 + "\n")
+        self.log_output("第四阶段：启动后台与对话")
+        self.log_output("=" * 60 + "\n\n")
+        
+        # 1. 安装守护进程
+        self.log_output("【步骤 1/3】安装守护进程\n")
+        
+        returncode, stdout, stderr = self.run_command(
+            'openclaw-cn gateway install'
+        )
+        
+        if returncode == 0:
+            self.log_output("✓ 守护进程已安装\n")
+        else:
+            self.log_output("⚠️  守护进程安装失败，继续尝试启动\n")
+        
+        # 2. 启动网关
+        self.log_output("\n【步骤 2/3】启动网关\n")
+        
+        returncode, stdout, stderr = self.run_command(
+            'openclaw-cn gateway start'
+        )
+        
+        if returncode == 0:
+            self.log_output("✓ 网关已启动\n")
+        else:
+            self.log_output("⚠️  网关启动失败\n")
+        
+        # 等待一下让服务启动
+        self.log_output("\n等待服务启动...\n")
+        time.sleep(2)
+        
+        # 3. 进入对话终端
+        self.log_output("\n【步骤 3/3】进入对话终端\n")
+        
+        self.log_output("\n" + "=" * 60 + "\n")
+        self.log_output("✓ 安装全部完成！\n")
+        self.log_output("=" * 60 + "\n\n")
+        
+        self.log_output("使用方法：\n")
+        self.log_output("  openclaw-cn gateway start    # 启动服务\n")
+        self.log_output("  openclaw-cn gateway stop     # 停止服务\n")
+        self.log_output("  openclaw-cn --help          # 查看帮助\n")
+        self.log_output("  openclaw-cn status           # 查看状态\n")
+        
+        self.update_status("全部安装完成！")
+        self.update_progress(100)
+        
+        # 弹窗提示
+        if self.root:
+            self.root.after(0, lambda: messagebox.showinfo(
+                "安装完成",
+                "OpenClaw 安装完成！\n\n"
+                "使用命令启动对话：\n"
+                "openclaw-cn"
+            ))
+    
+    def run(self):
+        """运行主循环"""
+        if self.root:
+            self.root.mainloop()
+
+
+class APIKeyDialog:
+    """API Key 输入对话框"""
+    
+    def __init__(self, parent):
+        self.dialog = tk.Toplevel(parent)
+        self.dialog.title("输入 API Key")
+        self.dialog.geometry("500x200")
+        self.dialog.transient(parent)
+        self.dialog.grab_set()
+        
+        self.api_key = None
+        
+        # 居中
+        self.dialog.update_idletasks()
+        x = (self.dialog.winfo_screenwidth() - 500) // 2
+        y = (self.dialog.winfo_screenheight() - 200) // 2
+        self.dialog.geometry(f"500x200+{x}+{y}")
+        
+        # 说明
+        info_label = ttk.Label(
+            self.dialog,
+            text="请输入 Anthropic Claude API Key",
+            font=('Helvetica', 11)
+        )
+        info_label.pack(pady=(20, 10))
+        
+        info_label2 = ttk.Label(
+            self.dialog,
+            text="（可在 anthropic.com 获取）",
+            font=('Helvetica', 9)
+        )
+        info_label2.pack(pady=(0, 10))
+        
+        # 输入框
+        self.entry = ttk.Entry(self.dialog, width=50, show="*")
+        self.entry.pack(pady=10)
+        
+        # 按钮
+        btn_frame = ttk.Frame(self.dialog)
+        btn_frame.pack(pady=20)
+        
+        ttk.Button(
+            btn_frame,
+            text="确认",
+            command=self.on_ok
+        ).pack(side=tk.LEFT, padx=5)
+        
+        ttk.Button(
+            btn_frame,
+            text="取消",
+            command=self.on_cancel
+        ).pack(side=tk.LEFT, padx=5)
+        
+        self.entry.focus()
+        self.entry.bind('<Return>', lambda e: self.on_ok())
+        
+    def on_ok(self):
+        self.api_key = self.entry.get().strip()
+        if self.api_key:
+            self.dialog.destroy()
+        else:
+            messagebox.showwarning("警告", "请输入 API Key")
+    
+    def on_cancel(self):
+        self.api_key = None
+        self.dialog.destroy()
+
+
+# 终端模式安装器
+class TerminalInstaller:
+    """终端模式安装器"""
+    
+    def __init__(self):
+        """初始化终端安装器"""
+        self.api_key = ""
+        self.platform = self.detect_platform()
+    
+    def detect_platform(self) -> str:
+        """检测平台"""
+        if Platform.is_windows():
+            return "windows"
+        elif Platform.is_macos():
+            return "macos"
+        else:
+            return "unknown"
+    
+    def run_command(self, cmd: str, shell: bool = True) -> tuple:
+        """执行命令并返回 (returncode, stdout, stderr)"""
+        print(f"\n$ {cmd}")
+        print("-" * 50)
+        
+        try:
+            result = subprocess.run(
+                cmd if shell else cmd.split(),
+                shell=shell,
+                capture_output=True,
+                text=True
+            )
+            
+            if result.stdout:
+                print(result.stdout)
+            if result.stderr:
+                print(result.stderr)
+            
+            print(f"返回码: {result.returncode}")
+            return result.returncode, result.stdout, result.stderr
+            
+        except Exception as e:
+            print(f"✗ 执行失败: {e}")
+            return -1, "", str(e)
+    
+    def print_banner(self):
+        """打印横幅"""
+        print("\n" + "=" * 50)
+        print("   OpenClaw 简易安装器 v2.2（终端模式）")
+        print("=" * 50 + "\n")
+    
+    def run(self):
+        """运行终端模式"""
+        self.print_banner()
+        
+        if self.platform != "windows":
+            print(f"⚠️  此版本仅支持 Windows，检测到平台: {self.platform}")
+            return
+        
+        print("Windows 安装流程\n")
+        
+        # 第一阶段
+        print("=" * 50)
+        print("第一阶段：安装基础环境")
+        print("=" * 50)
+        
+        print("\n使用 winget 安装 Node.js LTS...")
+        self.run_command('winget install OpenJS.NodeJS.LTS --silent --accept-package-agreements --accept-source-agreements')
+        
+        print("\n⚠️  请关闭当前 CMD 窗口，重新以管理员身份打开新窗口")
+        input("然后按回车继续...")
+        
+        # 检查 Node.js
+        returncode, stdout, stderr = self.run_command('node --version')
+        if returncode != 0:
+            print("✗ Node.js 未安装或未生效")
+            return
+        
+        print(f"✓ Node.js 版本: {stdout.strip()}")
+        
+        # 第二阶段
+        print("\n" + "=" * 50)
+        print("第二阶段：安装 OpenClaw 本体")
+        print("=" * 50)
+        
+        self.run_command('npm install -g openclaw-cn')
+        
+        # 第三阶段
+        print("\n" + "=" * 50)
+        print("第三阶段：配置 API Key")
+        print("=" * 50)
+        
+        self.api_key = input("请输入 Anthropic Claude API Key: ").strip()
+        
+        if self.api_key:
+            config_dir = os.path.join(os.environ.get('APPDATA', ''), 'openclaw')
+            os.makedirs(config_dir, exist_ok=True)
+            
+            config_file = os.path.join(config_dir, 'config.yaml')
+            config_content = f"apiKeys:\n  anthropic: {self.api_key}\n"
+            
+            with open(config_file, 'w', encoding='utf-8') as f:
+                f.write(config_content)
+            
+            print("✓ API Key 已配置")
+        
+        # 第四阶段
+        print("\n" + "=" * 50)
+        print("第四阶段：启动后台与对话")
+        print("=" * 50)
+        
+        self.run_command('openclaw-cn gateway install')
+        self.run_command('openclaw-cn gateway start')
+        
+        print("\n" + "=" * 50)
+        print("✓ 安装完成！")
+        print("=" * 50)
+        print("\n使用命令启动对话: openclaw-cn")
+
 
 if __name__ == '__main__':
-    if not HAS_TKINTER:
-        sys.exit(1)
-    root = tk.Tk()
-    app = OpenClawApp(root)
-    root.mainloop()
+    if HAS_TKINTER:
+        # GUI 模式
+        root = tk.Tk()
+        app = WindowsInstaller(root)
+        app.run()
+    else:
+        # 终端模式
+        app = TerminalInstaller()
+        app.run()
