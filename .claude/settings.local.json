@@ -5,7 +5,17 @@
       "Bash(pip3 install:*)",
       "Bash(brew install:*)",
       "Bash(echo:*)",
-      "Bash(pip3 show:*)"
+      "Bash(pip3 show:*)",
+      "Bash(python:*)",
+      "Bash(tasklist:*)",
+      "Bash(where pyinstaller:*)",
+      "Bash(pip install:*)",
+      "Bash(pyinstaller:*)",
+      "Bash(openclaw gateway:*)",
+      "Bash(node:*)",
+      "Bash(netstat:*)",
+      "Bash(rm:*)",
+      "Bash(taskkill:*)"
     ]
   }
 }

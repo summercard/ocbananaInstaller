@@ -311,7 +311,11 @@ class OpenClawApp:
         
         btn5 = ttk.Button(btn_frame, text="6. 测试安装 (查看 OpenClaw 版本)", command=self.cmd_test_openclaw)
         btn5.pack(**btn_style)
-        
+
+        # 第六步之后、第七步之前：生成 Gateway 配置模板
+        btn6_pre = ttk.Button(btn_frame, text="6.5 生成 Gateway 配置模板 (必须先执行)", command=self.cmd_gen_gateway_config)
+        btn6_pre.pack(**btn_style)
+
         btn6 = ttk.Button(btn_frame, text="7. 注册后台网关服务 (Gateway Install)", command=self.cmd_install_gateway)
         btn6.pack(**btn_style)
         
@@ -355,7 +359,47 @@ class OpenClawApp:
         # 右侧：API 配置
         cfg_frame = ttk.LabelFrame(content_frame, text="API 配置 (原生 openclaw.json)")
         cfg_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
-        
+
+        # API 服务商配置信息
+        self.api_provider_info = {
+            'minimax': {
+                'name': 'MiniMax',
+                'provider': 'minimax',
+                'baseUrl': 'https://api.minimax.chat/v1',
+                'apiType': 'openai-completions',
+                'envKey': 'MINIMAX_API_KEY',
+                'defaultModel': 'MiniMax-M2.1',
+                'input': ['text'],
+                'reasoning': False,
+                'contextWindow': 200000,
+                'maxTokens': 8192
+            },
+            'bigmodel': {
+                'name': 'BigModel (智谱)',
+                'provider': 'bigmodel',
+                'baseUrl': 'https://open.bigmodel.cn/api/paas/v4',
+                'apiType': 'openai-completions',
+                'envKey': 'BIGMODEL_API_KEY',
+                'defaultModel': 'glm-4',
+                'input': ['text'],
+                'reasoning': False,
+                'contextWindow': 128000,
+                'maxTokens': 8192
+            },
+            'google': {
+                'name': 'Google Gemini',
+                'provider': 'google',
+                'baseUrl': 'https://generativelanguage.googleapis.com/v1beta',
+                'apiType': 'google-generative-ai',
+                'envKey': 'GEMINI_API_KEY',
+                'defaultModel': 'gemini-2.5-flash-preview-05-20',
+                'input': ['text', 'image'],
+                'reasoning': True,
+                'contextWindow': 1000000,
+                'maxTokens': 64000
+            }
+        }
+
         # 表单字段
         self.cfg_vars = {
             'api_type': tk.StringVar(value='minimax'),
@@ -364,7 +408,17 @@ class OpenClawApp:
             'model_name': tk.StringVar(value='MiniMax-M2.1'),
             'port': tk.StringVar(value='18789')
         }
-        
+
+        # 当选择不同的 API 服务商时，自动填充对应的 URL
+        def on_api_type_change(*args):
+            api_type = self.cfg_vars['api_type'].get()
+            if api_type in self.api_provider_info:
+                info = self.api_provider_info[api_type]
+                self.cfg_vars['api_url'].set(info['baseUrl'])
+                self.cfg_vars['model_name'].set(info['defaultModel'])
+
+        self.cfg_vars['api_type'].trace('w', on_api_type_change)
+
         fields = [
             ("API 服务商:", 'api_type'),
             ("API URL:", 'api_url'),
@@ -372,20 +426,24 @@ class OpenClawApp:
             ("模型名称:", 'model_name'),
             ("服务端口:", 'port')
         ]
-        
+
         for idx, (label_text, var_name) in enumerate(fields):
             f = ttk.Frame(cfg_frame)
             f.pack(fill=tk.X, padx=10, pady=3)
             ttk.Label(f, text=label_text, width=12).pack(side=tk.LEFT)
             if var_name == 'api_type':
-                cb = ttk.Combobox(f, textvariable=self.cfg_vars[var_name], values=['minimax', 'openai', 'custom'])
+                cb = ttk.Combobox(f, textvariable=self.cfg_vars[var_name], values=['minimax', 'bigmodel', 'google'], state='readonly')
                 cb.pack(side=tk.LEFT, fill=tk.X, expand=True)
             elif var_name == 'api_key':
                 ttk.Entry(f, textvariable=self.cfg_vars[var_name], show="*").pack(side=tk.LEFT, fill=tk.X, expand=True)
             else:
                 ttk.Entry(f, textvariable=self.cfg_vars[var_name]).pack(side=tk.LEFT, fill=tk.X, expand=True)
-                
-        ttk.Button(cfg_frame, text="💾 保存并应用配置", command=self.cmd_save_config).pack(pady=10)
+
+        # 两个按钮：新增 API 服务 和 更新 API
+        btn_frame = ttk.Frame(cfg_frame)
+        btn_frame.pack(pady=10)
+        ttk.Button(btn_frame, text="➕ 新增 API 服务", command=self.cmd_add_api_service).pack(side=tk.LEFT, padx=5)
+        ttk.Button(btn_frame, text="🔄 更新已有 API", command=self.cmd_update_api).pack(side=tk.LEFT, padx=5)
 
     def show_layer1(self):
         self.layer2_frame.pack_forget()
@@ -527,7 +585,82 @@ class OpenClawApp:
 
     def cmd_test_openclaw(self):
         self.run_command_in_bg("测试安装", "openclaw --version")
-        
+
+    def cmd_gen_gateway_config(self):
+        """修补 Gateway 配置文件（只添加缺少的 mode 和 port 字段，避免启动失败）"""
+        import secrets
+        import os
+        import json
+
+        # 生成随机 Gateway Token（如果已有则保留）
+        if hasattr(self, 'gateway_token') and self.gateway_token:
+            gateway_token = self.gateway_token
+        else:
+            gateway_token = secrets.token_hex(20)
+
+        target_os = self.os_var.get()
+
+        # 直接在 Python 中修补配置（避免命令转义问题）
+        def patch_config():
+            try:
+                if target_os == "windows":
+                    config_file = os.path.join(os.environ.get('USERPROFILE', 'C:\\'), '.openclaw', 'openclaw.json')
+                else:
+                    config_file = os.path.expanduser('~/.openclaw/openclaw.json')
+
+                os.makedirs(os.path.dirname(config_file), exist_ok=True)
+
+                # 读取现有配置或创建新配置
+                if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
+                    try:
+                        with open(config_file, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                    except:
+                        config = {}
+                else:
+                    config = {}
+
+                # 只修补缺少的字段
+                if 'commands' not in config:
+                    config['commands'] = {'native': 'auto', 'nativeSkills': 'auto', 'restart': True, 'ownerDisplay': 'raw'}
+
+                if 'gateway' not in config:
+                    config['gateway'] = {}
+                if 'mode' not in config.get('gateway', {}):
+                    config['gateway']['mode'] = 'local'
+                if 'port' not in config.get('gateway', {}):
+                    config['gateway']['port'] = 18789
+                if 'auth' not in config.get('gateway', {}):
+                    config['gateway']['auth'] = {'mode': 'token', 'token': gateway_token}
+                if 'token' not in config.get('gateway', {}).get('auth', {}):
+                    config['gateway']['auth']['token'] = gateway_token
+
+                if 'meta' not in config:
+                    config['meta'] = {'lastTouchedVersion': '2026.2.26', 'lastTouchedAt': '2026-03-01T00:00:00.000Z'}
+
+                # 写回文件
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, ensure_ascii=False, indent=2)
+
+                self.log_terminal(f"✅ Gateway 配置修补完成！Token: {gateway_token}\n文件: {config_file}\n")
+                return True
+            except Exception as e:
+                self.log_terminal(f"❌ 配置修补失败: {str(e)}\n")
+                return False
+
+        # 保存 token 供后续使用
+        self.gateway_token = gateway_token
+
+        # 在后台线程执行修补
+        def task():
+            success = patch_config()
+            if success:
+                self.root.after(100, lambda: messagebox.showinfo("配置修补", f"Gateway 配置修补完成！\n\n已添加缺少的字段：\n- gateway.mode = local\n- gateway.port = 18789\n\nToken: {gateway_token}\n\n请在后续步骤启动 Gateway。"))
+
+        thread = threading.Thread(target=task)
+        thread.daemon = True
+        thread.start()
+
     def cmd_install_gateway(self):
         self.run_command_in_bg("注册后台网关服务", "openclaw gateway install")
 
@@ -603,109 +736,241 @@ class OpenClawApp:
             
         self.run_command_in_bg("打开 WebUI", cmd)
 
-    def cmd_save_config(self):
-        """保存并应用配置 (通过终端执行文件写入完整规范模板)"""
+    def cmd_add_api_service(self):
+        """新增 API 服务（在原有配置基础上增加一个新的 API 模型）"""
+        import os
+        import json
         import secrets
-        
-        # 生成一个随机的 gateway token
-        gateway_token = secrets.hex(20)
-        
-        # 完整的、经过验证的 OpenClaw 标准配置模板
-        config_template = {
-            "meta": {
-                "lastTouchedVersion": "2026.2.25",
-                "lastTouchedAt": "2026-02-28T07:18:58.181Z"
-            },
-            "env": {
-                "MINIMAX_API_KEY": self.cfg_vars['api_key'].get() or "",
-                "GEMINI_API_KEY": ""
-            },
-            "wizard": {
-                "lastRunAt": "2026-02-28T07:18:58.159Z",
-                "lastRunVersion": "2026.2.25",
-                "lastRunCommand": "doctor",
-                "lastRunMode": "local"
-            },
-            "models": {
-                "mode": "merge",
-                "providers": {
-                    "minimax": {
-                        "baseUrl": self.cfg_vars['api_url'].get() or "https://api.minimax.chat/v1",
-                        "apiKey": "${MINIMAX_API_KEY}",
-                        "api": "openai-completions",
-                        "models": [
-                            {
-                                "id": self.cfg_vars['model_name'].get() or "MiniMax-M2.1",
-                                "name": self.cfg_vars['model_name'].get() or "MiniMax M2.1",
-                                "reasoning": False,
-                                "input": ["text"],
-                                "contextWindow": 200000,
-                                "maxTokens": 8192
-                            }
-                        ]
-                    }
-                }
-            },
-            "agents": {
-                "defaults": {
-                    "model": {
-                        "primary": f"minimax/{self.cfg_vars['model_name'].get() or 'MiniMax-M2.1'}"
-                    },
-                    "models": {
-                        f"minimax/{self.cfg_vars['model_name'].get() or 'MiniMax-M2.1'}": {}
-                    },
-                    "workspace": "~\\.openclaw\\workspace",
-                    "compaction": {
-                        "mode": "safeguard"
-                    }
-                }
-            },
-            "commands": {
-                "native": "auto",
-                "nativeSkills": "auto",
-                "restart": True,
-                "ownerDisplay": "raw"
-            },
-            "gateway": {
-                "mode": "local",
-                "port": int(self.cfg_vars['port'].get() or 18789),
-                "auth": {
-                    "mode": "token",
-                    "token": gateway_token
-                }
-            },
-            "plugins": {
-                "entries": {}
-            }
-        }
-        
-        json_str = json.dumps(config_template, ensure_ascii=False, indent=2)
+
         target_os = self.os_var.get()
+        api_type = self.cfg_vars['api_type'].get()
+        api_url = self.cfg_vars['api_url'].get()
+        api_key = self.cfg_vars['api_key'].get()
+        model_name = self.cfg_vars['model_name'].get()
+        port = self.cfg_vars['port'].get() or '18789'
 
-        if target_os == "macos":
-            cmd = f"""
-mkdir -p ~/.openclaw
-cat << 'EOF' > ~/.openclaw/openclaw.json
-{json_str}
-EOF
-echo "✅ 完整规范配置已成功写入 ~/.openclaw/openclaw.json"
-            """.strip()
-        else:
-            config_dir_win = os.path.join(os.environ.get('USERPROFILE', 'C:\\'), '.openclaw')
-            config_file_win = os.path.join(config_dir_win, 'openclaw.json')
-            json_inline = json.dumps(config_template, ensure_ascii=False).replace("'", "\\'")
-            safe_dir = config_dir_win.replace('\\', '\\\\')
-            safe_file = config_file_win.replace('\\', '\\\\')
-            cmd = f"""
-python -c "import os, json; os.makedirs(r'{safe_dir}', exist_ok=True); f=open(r'{safe_file}', 'w', encoding='utf-8'); f.write('{json_inline}'); f.close(); print('✅ 完整规范配置已成功写入')"
-            """.strip()
+        # 获取 API 服务商配置
+        if api_type not in self.api_provider_info:
+            messagebox.showerror("错误", f"不支持的 API 服务商: {api_type}")
+            return
 
-        self.run_command_in_bg("保存并应用配置", cmd)
-        
-        # 保存 token 到实例变量，供打开 WebUI 时使用
+        provider_info = self.api_provider_info[api_type]
+        env_key = provider_info['envKey']
+
+        # 生成 gateway token
+        gateway_token = secrets.token_hex(20)
+
+        def patch_config():
+            try:
+                if target_os == "windows":
+                    config_file = os.path.join(os.environ.get('USERPROFILE', 'C:\\'), '.openclaw', 'openclaw.json')
+                else:
+                    config_file = os.path.expanduser('~/.openclaw/openclaw.json')
+
+                os.makedirs(os.path.dirname(config_file), exist_ok=True)
+
+                # 读取现有配置
+                if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
+                    try:
+                        with open(config_file, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                    except:
+                        config = {}
+                else:
+                    config = {}
+
+                # 确保基本结构存在
+                if 'commands' not in config:
+                    config['commands'] = {'native': 'auto', 'nativeSkills': 'auto', 'restart': True, 'ownerDisplay': 'raw'}
+                if 'gateway' not in config:
+                    config['gateway'] = {'mode': 'local', 'port': int(port), 'auth': {'mode': 'token', 'token': gateway_token}}
+                if 'meta' not in config:
+                    config['meta'] = {'lastTouchedVersion': '2026.2.26', 'lastTouchedAt': '2026-03-01T00:00:00.000Z'}
+                if 'env' not in config:
+                    config['env'] = {}
+                if 'models' not in config:
+                    config['models'] = {'mode': 'merge', 'providers': {}}
+                if 'agents' not in config:
+                    config['agents'] = {'defaults': {'workspace': '~/.openclaw/workspace', 'compaction': {'mode': 'safeguard'}}}
+
+                # 设置 env 中的 API Key
+                # 清理 API Key，去除换行和空白
+                api_key_clean = api_key.strip().replace('\n', '').replace('\r', '')
+                config['env'][env_key] = api_key_clean
+
+                # 添加 models.providers
+                if 'providers' not in config['models']:
+                    config['models']['providers'] = {}
+
+                # 获取 provider 名称（用于配置文件中的 key）
+                provider_name = provider_info.get('provider', api_type)
+                api_type_value = provider_info.get('apiType', 'openai-completions')
+
+                # 构建 provider 配置
+                config['models']['providers'][provider_name] = {
+                    'baseUrl': api_url,
+                    'apiKey': f'${{{env_key}}}',
+                    'api': api_type_value,
+                    'models': [
+                        {
+                            'id': model_name,
+                            'name': model_name,
+                            'reasoning': provider_info.get('reasoning', False),
+                            'input': provider_info.get('input', ['text']),
+                            'contextWindow': provider_info.get('contextWindow', 128000),
+                            'maxTokens': provider_info.get('maxTokens', 4096)
+                        }
+                    ]
+                }
+
+                # 设置默认模型
+                config['agents']['defaults']['model'] = {'primary': f'{provider_name}/{model_name}'}
+                if 'models' not in config['agents']['defaults']:
+                    config['agents']['defaults']['models'] = {}
+                config['agents']['defaults']['models'][f'{provider_name}/{model_name}'] = {}
+
+                # 写回文件
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, ensure_ascii=False, indent=2)
+
+                self.log_terminal(f"✅ 新增 API 服务完成！\nAPI 类型: {api_type}\n模型: {model_name}\n文件: {config_file}\n")
+                return True
+            except Exception as e:
+                self.log_terminal(f"❌ 新增 API 服务失败: {str(e)}\n")
+                return False
+
+        # 保存 token
         self.gateway_token = gateway_token
-        
-        messagebox.showinfo("成功", f"【{target_os.upper()}】完整规范配置已写入！\n\nGateway Token: {gateway_token}\n\n请点击启动服务后再打开 WebUI。")
+
+        # 在后台线程执行
+        def task():
+            success = patch_config()
+            if success:
+                self.root.after(100, lambda: messagebox.showinfo("成功", f"✅ 新增 API 服务完成！\n\nAPI 服务商: {api_type}\n模型: {model_name}\n\nGateway Token: {gateway_token}\n\n请重启 Gateway 服务后生效。"))
+
+        thread = threading.Thread(target=task)
+        thread.daemon = True
+        thread.start()
+
+    def cmd_update_api(self):
+        """更新 API（在原有配置基础上更新已有字段）"""
+        import os
+        import json
+        import secrets
+
+        target_os = self.os_var.get()
+        api_type = self.cfg_vars['api_type'].get()
+        api_url = self.cfg_vars['api_url'].get()
+        api_key = self.cfg_vars['api_key'].get()
+        model_name = self.cfg_vars['model_name'].get()
+        port = self.cfg_vars['port'].get() or '18789'
+
+        # 获取 API 服务商配置
+        if api_type not in self.api_provider_info:
+            messagebox.showerror("错误", f"不支持的 API 服务商: {api_type}")
+            return
+
+        provider_info = self.api_provider_info[api_type]
+        env_key = provider_info['envKey']
+
+        # 生成 gateway token（保留原有的如果有）
+        gateway_token = secrets.token_hex(20)
+
+        def patch_config():
+            try:
+                if target_os == "windows":
+                    config_file = os.path.join(os.environ.get('USERPROFILE', 'C:\\'), '.openclaw', 'openclaw.json')
+                else:
+                    config_file = os.path.expanduser('~/.openclaw/openclaw.json')
+
+                os.makedirs(os.path.dirname(config_file), exist_ok=True)
+
+                # 读取现有配置
+                if os.path.exists(config_file) and os.path.getsize(config_file) > 0:
+                    try:
+                        with open(config_file, 'r', encoding='utf-8') as f:
+                            config = json.load(f)
+                    except:
+                        config = {}
+                else:
+                    config = {}
+
+                # 确保基本结构存在
+                if 'commands' not in config:
+                    config['commands'] = {'native': 'auto', 'nativeSkills': 'auto', 'restart': True, 'ownerDisplay': 'raw'}
+                if 'gateway' not in config:
+                    config['gateway'] = {'mode': 'local', 'port': int(port), 'auth': {'mode': 'token', 'token': gateway_token}}
+                else:
+                    # 保留原有的 gateway token
+                    if 'auth' in config.get('gateway', {}) and 'token' in config['gateway']['auth']:
+                        gateway_token = config['gateway']['auth']['token']
+                if 'meta' not in config:
+                    config['meta'] = {'lastTouchedVersion': '2026.2.26', 'lastTouchedAt': '2026-03-01T00:00:00.000Z'}
+                if 'env' not in config:
+                    config['env'] = {}
+                if 'models' not in config:
+                    config['models'] = {'mode': 'merge', 'providers': {}}
+                if 'agents' not in config:
+                    config['agents'] = {'defaults': {'workspace': '~/.openclaw/workspace', 'compaction': {'mode': 'safeguard'}}}
+
+                # 更新 env 中的 API Key
+                # 清理 API Key，去除换行和空白
+                api_key_clean = api_key.strip().replace('\n', '').replace('\r', '')
+                config['env'][env_key] = api_key_clean
+
+                # 获取 provider 名称（用于配置文件中的 key）
+                provider_name = provider_info.get('provider', api_type)
+                api_type_value = provider_info.get('apiType', 'openai-completions')
+
+                # 更新 models.providers
+                if 'providers' not in config['models']:
+                    config['models']['providers'] = {}
+
+                # 更新或添加 provider 配置
+                config['models']['providers'][provider_name] = {
+                    'baseUrl': api_url,
+                    'apiKey': f'${{{env_key}}}',
+                    'api': api_type_value,
+                    'models': [
+                        {
+                            'id': model_name,
+                            'name': model_name,
+                            'reasoning': provider_info.get('reasoning', False),
+                            'input': provider_info.get('input', ['text']),
+                            'contextWindow': provider_info.get('contextWindow', 128000),
+                            'maxTokens': provider_info.get('maxTokens', 4096)
+                        }
+                    ]
+                }
+
+                # 更新默认模型
+                config['agents']['defaults']['model'] = {'primary': f'{provider_name}/{model_name}'}
+                if 'models' not in config['agents']['defaults']:
+                    config['agents']['defaults']['models'] = {}
+                config['agents']['defaults']['models'][f'{provider_name}/{model_name}'] = {}
+
+                # 写回文件
+                with open(config_file, 'w', encoding='utf-8') as f:
+                    json.dump(config, f, ensure_ascii=False, indent=2)
+
+                self.log_terminal(f"✅ 更新 API 完成！\nAPI 类型: {api_type}\n模型: {model_name}\n文件: {config_file}\n")
+                return True
+            except Exception as e:
+                self.log_terminal(f"❌ 更新 API 失败: {str(e)}\n")
+                return False
+
+        # 保存 token
+        self.gateway_token = gateway_token
+
+        # 在后台线程执行
+        def task():
+            success = patch_config()
+            if success:
+                self.root.after(100, lambda: messagebox.showinfo("成功", f"✅ 更新 API 完成！\n\nAPI 服务商: {api_type}\n模型: {model_name}\n\n请重启 Gateway 服务后生效。"))
+
+        thread = threading.Thread(target=task)
+        thread.daemon = True
+        thread.start()
 
     def load_config(self):
         """应用启动时，尝试本地读取一下配置填充到 GUI"""
