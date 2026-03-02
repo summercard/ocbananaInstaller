@@ -459,7 +459,8 @@ class OpenClawApp:
         col1_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
         create_button(col1_frame, "1. 检查环境", self.cmd_check_deps)
-        create_button(col1_frame, "2. 安装 Node.js\n(重启刷新变量)", self.cmd_install_node)
+        # 隐藏"安装 Node.js"按钮，保留代码
+        # create_button(col1_frame, "2. 安装 Node.js\n(重启刷新变量)", self.cmd_install_node)
         create_button(col1_frame, "3. 下载 Node.js\n(LTS长期支持版)", self.cmd_download_node)
         create_button(col1_frame, "4. 安装 Git", self.cmd_install_git)
 
