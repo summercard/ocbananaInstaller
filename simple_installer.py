@@ -477,7 +477,7 @@ class OpenClawApp:
 
         create_button(col3_frame, "9. 进入控制台 ➔", self.show_layer2, 'Green.TButton')
         create_button(col3_frame, "❓ 疑难解答 (FAQ)", self.show_layer3, 'Orange.TButton')
-        create_button(col3_frame, "🔮 邪修：Claude安装法", self.show_layer4, 'Purple.TButton')
+        create_button(col3_frame, "🔮 邪修：Claude Code安装法", self.show_layer4, 'Purple.TButton')
 
     def build_layer2(self):
         """构建第二层：控制与配置界面"""
@@ -619,7 +619,7 @@ class OpenClawApp:
         self.layer3_frame.pack(fill=tk.BOTH, expand=True)
 
     def show_layer4(self):
-        """显示邪修：Claude安装法页面"""
+        """显示邪修：Claude Code安装法页面"""
         self.layer1_frame.pack_forget()
         self.layer2_frame.pack_forget()
         self.layer3_frame.pack_forget()
@@ -1074,14 +1074,14 @@ A: 如需更多帮助，您可以：
         self.run_command_in_bg("注册后台网关服务", "openclaw gateway install")
 
     def build_layer4(self):
-        """构建第四层：邪修：Claude安装法界面"""
+        """构建第四层：邪修：Claude Code安装法界面"""
         # 顶部导航
         nav_frame = ttk.Frame(self.layer4_frame)
         nav_frame.pack(fill=tk.X, pady=5)
         back_btn = ttk.Button(nav_frame, text="← 返回安装界面", command=self.show_layer1)
         back_btn.pack(side=tk.LEFT)
 
-        lbl = ttk.Label(nav_frame, text="🔮 邪修：Claude安装法", font=('Helvetica', 16, 'bold'))
+        lbl = ttk.Label(nav_frame, text="🔮 邪修：Claude Code安装法", font=('Helvetica', 16, 'bold'))
         lbl.pack(side=tk.LEFT, padx=20)
 
         # 说明区域
@@ -1090,7 +1090,7 @@ A: 如需更多帮助，您可以：
 
         desc_label = ttk.Label(
             desc_frame,
-            text="本方法先安装 Claude，配置模型后，直接使用自然语言安装 OpenClaw，比傻瓜还傻瓜。（Node.js 安装依然必须）",
+            text="本方法先安装 Claude Code，配置模型后，直接使用自然语言安装 OpenClaw，比傻瓜还傻瓜。（Node.js 安装依然必须）",
             font=('Helvetica', 11),
             foreground="#0066cc",
             wraplength=600
@@ -1101,11 +1101,11 @@ A: 如需更多帮助，您可以：
         btn_frame = ttk.Frame(self.layer4_frame)
         btn_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
-        # 第一列：安装 Claude
-        col1_frame = ttk.LabelFrame(btn_frame, text="步骤1：安装 Claude")
+        # 第一列：安装 Claude Code
+        col1_frame = ttk.LabelFrame(btn_frame, text="步骤1：安装 Claude Code")
         col1_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
-        tk.Button(col1_frame, text="📦 安装 Claude", command=self.cmd_install_claude, bg="#404040", fg="white", font=('Helvetica', 11), height=2).pack(fill=tk.X, padx=10, pady=10)
+        tk.Button(col1_frame, text="📦 安装 Claude Code", command=self.cmd_install_claude, bg="#404040", fg="white", font=('Helvetica', 11), height=2).pack(fill=tk.X, padx=10, pady=10)
 
         ttk.Label(col1_frame, text="执行命令:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
         cmd_label = ttk.Label(col1_frame, text="npm install -g @anthropic-ai/claude-code", font=('Consolas', 9), foreground="blue")
@@ -1119,7 +1119,7 @@ A: 如需更多帮助，您可以：
         tk.Button(col2_frame, text="🌐 打开下载页面 (Windows)", command=self.cmd_open_ccswitch_windows, bg="#404040", fg="white", font=('Helvetica', 11)).pack(fill=tk.X, padx=10, pady=5)
 
         ttk.Label(col2_frame, text="⚠️ 重要:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
-        ttk.Label(col2_frame, text="安装后在 cc-switch 中给 Claude 配置大模型", font=('Helvetica', 9), foreground="red").pack(anchor="w", padx=10, pady=(0, 10))
+        ttk.Label(col2_frame, text="安装后在 cc-switch 中给 Claude Code 配置大模型", font=('Helvetica', 9), foreground="red").pack(anchor="w", padx=10, pady=(0, 10))
 
         # 第三列：启动和使用
         col3_frame = ttk.LabelFrame(btn_frame, text="步骤3：启动和使用")
@@ -1128,12 +1128,12 @@ A: 如需更多帮助，您可以：
         tk.Button(col3_frame, text="🚀 打开 Claude", command=self.cmd_open_claude, bg="#404040", fg="white", font=('Helvetica', 11), height=2).pack(fill=tk.X, padx=10, pady=10)
 
         ttk.Label(col3_frame, text="💡 使用方法:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
-        usage_text = "打开 Claude 后，输入：\n\"帮我安装 openclaw，并且配置 xxxapikey，apikey：xxxxxx\""
+        usage_text = "打开 Claude Code 后，输入：\n\"帮我安装 openclaw，并且配置 xxxapikey，apikey：xxxxxx\""
         ttk.Label(col3_frame, text=usage_text, font=('Helvetica', 9), foreground="green").pack(anchor="w", padx=10, pady=(0, 10))
 
     def cmd_install_claude(self):
-        """安装 Claude"""
-        self.run_command_in_bg("安装 Claude", "npm install -g @anthropic-ai/claude-code")
+        """安装 Claude Code"""
+        self.run_command_in_bg("安装 Claude Code", "npm install -g @anthropic-ai/claude-code")
 
     def cmd_install_ccswitch_mac(self):
         """安装 cc-switch (Mac)"""
