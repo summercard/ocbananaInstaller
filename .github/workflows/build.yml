@@ -10,17 +10,24 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, ubuntu-latest]
+        os: [windows-latest, macos-latest, macos-13, ubuntu-latest]
         include:
           - os: windows-latest
             os_name: windows
             ext: .exe
+            arch: x64
           - os: macos-latest
             os_name: macos
             ext: .app
+            arch: arm64
+          - os: macos-13
+            os_name: macos-intel
+            ext: .app
+            arch: x64
           - os: ubuntu-latest
             os_name: linux
             ext: ""
+            arch: x64
 
     runs-on: ${{ matrix.os }}
 
@@ -52,6 +59,18 @@ jobs:
         cd dist
         ls -la
         if [ -f "OpenClawInstaller.app" ]; then
+          zip -r OpenClawInstaller-macOS-arm64.zip OpenClawInstaller.app
+        else
+          zip -r OpenClawInstaller-macOS-arm64.zip OpenClawInstaller
+        fi
+
+    - name: 构建 macOS Intel 版本
+      if: matrix.os == 'macos-13'
+      run: |
+        pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm simple_installer.py
+        cd dist
+        ls -la
+        if [ -f "OpenClawInstaller.app" ]; then
           zip -r OpenClawInstaller-macOS-x64.zip OpenClawInstaller.app
         else
           zip -r OpenClawInstaller-macOS-x64.zip OpenClawInstaller
@@ -70,6 +89,7 @@ jobs:
         name: OpenClawInstaller-${{ matrix.os_name }}
         path: dist/*
         retention-days: 30
+        if-no-files-found: error
 
   release:
     needs: build
@@ -93,7 +113,8 @@ jobs:
       with:
         files: |
           artifacts/OpenClawInstaller-windows/OpenClawInstaller-Windows-x64.exe
-          artifacts/OpenClawInstaller-macos/OpenClawInstaller-macOS-x64.zip
+          artifacts/OpenClawInstaller-macos/OpenClawInstaller-macOS-arm64.zip
+          artifacts/OpenClawInstaller-macos-intel/OpenClawInstaller-macOS-x64.zip
           artifacts/OpenClawInstaller-linux/OpenClawInstaller-Linux-x64.tar.gz
         draft: false
         prerelease: false
