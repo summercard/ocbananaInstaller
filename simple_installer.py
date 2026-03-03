@@ -1219,13 +1219,6 @@ A: 如需更多帮助，您可以：
                 self.log_terminal("✅ 已打开 Claude。\n📋 任务已复制到剪贴板，请在 Claude 界面按 Cmd+V 粘贴。\n")
             except Exception as e:
                 self.log_terminal(f"❌ 打开失败: {str(e)}\n")
-            end tell
-            '''
-            try:
-                subprocess.run(['osascript', '-e', script])
-                self.log_terminal("✅ 已打开 Claude 并输入任务\n")
-            except Exception as e:
-                self.log_terminal(f"❌ 打开失败: {str(e)}\n")
 
     def cmd_download_node(self):
         """打开 Node.js LTS 下载页面"""
