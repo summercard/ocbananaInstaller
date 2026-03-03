@@ -1240,12 +1240,12 @@ A: 如需更多帮助，您可以：
             try:
                 phase = int(glow_phase[0]) % 3
                 if phase == 0:
-                    self.title_label.config(fg=colors[current_idx[0]], text="◢◤ OpenClaw 傻瓜安装器 ◢◤")
+                    self.title_label.config(fg=colors[current_idx[0]], text="◢◤ OPENCLAW 邪修安装器 ◢◤")
                     glow_phase[0] += 1
                 elif phase == 1:
                     glow_phase[0] += 1
                 else:
-                    self.title_label.config(fg="#004433", text="◢◤ OpenClaw 傻瓜安装器 ◢◤")
+                    self.title_label.config(fg="#004433", text="◢◤ OPENCLAW 邪修安装器 ◢◤")
                     current_idx[0] = (current_idx[0] + 1) % len(colors)
                     glow_phase[0] = 0
                 self.title_label.after(500, animate)
