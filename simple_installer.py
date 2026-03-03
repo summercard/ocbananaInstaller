@@ -398,7 +398,7 @@ class OpenClawApp:
         # 霓虹灯标题文字
         self.title_label = tk.Label(
             title_frame,
-            text="◢◤ OPENCLAW 邪修安装器 ◢◤",
+            text="◢◤ OPENCLAW 傻瓜安装器 ◢◤",
             font=("Courier New", 22, "bold"),
             bg="#1a1a2e",
             fg="#00ffaa"
