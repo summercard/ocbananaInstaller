@@ -1568,6 +1568,11 @@ A: 如需更多帮助，您可以：
                     for key, var in self.cfg_vars.items():
                         if key in config_data:
                             var.set(str(config_data[key]))
+                    # 读取 gateway token
+                    if 'gateway' in config_data and 'auth' in config_data['gateway']:
+                        auth = config_data['gateway']['auth']
+                        if 'token' in auth:
+                            self.gateway_token = auth['token']
             except Exception as e:
                 print(f"读取配置失败: {e}")
 
