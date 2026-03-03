@@ -1107,13 +1107,18 @@ A: 如需更多帮助，您可以：
         )
         desc_label.pack(padx=15, pady=15)
 
-        # 按钮区域
+        # 按钮区域 - 使用 grid 布局代替 pack，实现自动换行
         btn_frame = ttk.Frame(self.layer4_frame)
         btn_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=5)
 
+        # 配置 grid 权重，让列自动调整
+        btn_frame.columnconfigure(0, weight=1)
+        btn_frame.columnconfigure(1, weight=1)
+        btn_frame.columnconfigure(2, weight=1)
+
         # 第一列：安装 Claude Code
-        col1_frame = ttk.LabelFrame(btn_frame, text="步骤1：安装 Claude Code")
-        col1_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        col1_frame = ttk.LabelFrame(btn_frame, text="步骤1")
+        col1_frame.grid(row=0, column=0, sticky="nsew", padx=5, pady=5)
 
         ttk.Button(col1_frame, text="📦 安装 Claude Code", command=self.cmd_install_claude, style='Dark.TButton', width=30).pack(fill=tk.X, padx=10, pady=10)
 
@@ -1122,8 +1127,8 @@ A: 如需更多帮助，您可以：
         cmd_label.pack(anchor="w", padx=10, pady=(0, 10))
 
         # 第二列：安装 cc-switch
-        col2_frame = ttk.LabelFrame(btn_frame, text="步骤2：安装 cc-switch")
-        col2_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        col2_frame = ttk.LabelFrame(btn_frame, text="步骤2")
+        col2_frame.grid(row=0, column=1, sticky="nsew", padx=5, pady=5)
 
         ttk.Button(col2_frame, text="🔄 安装 cc-switch (Mac)", command=self.cmd_install_ccswitch_mac, style='Dark.TButton', width=30).pack(fill=tk.X, padx=10, pady=5)
         ttk.Button(col2_frame, text="🌐 打开下载页面 (Windows)", command=self.cmd_open_ccswitch_windows, style='Dark.TButton', width=30).pack(fill=tk.X, padx=10, pady=5)
@@ -1132,8 +1137,8 @@ A: 如需更多帮助，您可以：
         ttk.Label(col2_frame, text="安装后在 cc-switch 中给 Claude Code 配置大模型", font=('Helvetica', 9), foreground="red").pack(anchor="w", padx=10, pady=(0, 10))
 
         # 第三列：启动和使用
-        col3_frame = ttk.LabelFrame(btn_frame, text="步骤3：启动和使用")
-        col3_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+        col3_frame = ttk.LabelFrame(btn_frame, text="步骤3")
+        col3_frame.grid(row=0, column=2, sticky="nsew", padx=5, pady=5)
 
         ttk.Button(col3_frame, text="🚀 打开 Claude", command=self.cmd_open_claude, style='Dark.TButton', width=30).pack(fill=tk.X, padx=10, pady=10)
 
