@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-OpenClaw 傻瓜安装与配置器
+ocbanana 安装与配置器
 - 增加 Mac / Win 系统切换开关
-- 第一层：安装系统依赖、安装 OpenClaw、打开 OpenClaw
+- 第一层：安装系统依赖、安装 ocbanana、打开 ocbanana
 - 第二层：启停控制、配置 API 等
 - 核心逻辑：前端为 GUI，所有操作均拼接为针对特定系统的终端命令，发送至后台执行并实时回显日志
 """
@@ -133,7 +133,7 @@ def get_asset_path(relative_path):
 class OpenClawApp:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("OpenClaw 安装与配置台")
+        self.root.title("ocbanana 安装与配置台")
         self.root.geometry("850x850")
         self.root.minsize(900, 750)
         self.center_window()
@@ -237,13 +237,13 @@ class OpenClawApp:
         # 杰西卡的说话内容
         jessica_dialogues = [
             "主人，欢迎回来！今天要做什么呢？🎀",
-            "OpenClaw 安装器已就绪，随时待命～",
+            "ocbanana 安装器已就绪，随时待命～",
             "主人，有什么需要帮忙的吗？",
             "今天也要加油哦！✨",
             "安装过程会很顺利的，相信我～",
             "主人，注意休息哦～ 🌟",
             "需要任何帮助，随时叫我！",
-            "OpenClaw 超好用的，主人会喜欢的！",
+            "ocbanana 超好用的，主人会喜欢的！",
             "主人，准备好了吗？开始吧～",
             "今天天气不错呢～ 🌸",
             "主人，我一直在你身边～",
@@ -398,7 +398,7 @@ class OpenClawApp:
         # 霓虹灯标题文字
         self.title_label = tk.Label(
             title_frame,
-            text="◢◤ OpenClaw 傻瓜安装器 ◢◤",
+            text="◢◤ ocbanana 安装器 ◢◤",
             font=("Courier New", 22, "bold"),
             bg="#1a1a2e",
             fg="#00ffaa"
@@ -464,8 +464,8 @@ class OpenClawApp:
         create_button(col1_frame, "3. 下载 Node.js\n(LTS长期支持版)", self.cmd_download_node)
         create_button(col1_frame, "4. 安装 Git", self.cmd_install_git)
 
-        # 中列：安装 OpenClaw
-        col2_frame = ttk.LabelFrame(btn_container, text="安装 OpenClaw")
+        # 中列：安装 ocbanana
+        col2_frame = ttk.LabelFrame(btn_container, text="安装 ocbanana")
         col2_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
         create_button(col2_frame, "🔮 邪修：Claude Code安装法", self.show_layer4)
@@ -478,7 +478,6 @@ class OpenClawApp:
 
         create_button(col3_frame, "9. 进入控制台 ➔", self.show_layer2, 'Green.TButton')
         create_button(col3_frame, "❓ 疑难解答 (FAQ)", self.show_layer3, 'Orange.TButton')
-        create_button(col3_frame, "🔮 邪修：Claude Code安装法", self.show_layer4, 'Purple.TButton')
 
     def build_layer2(self):
         """构建第二层：控制与配置界面"""
@@ -488,7 +487,7 @@ class OpenClawApp:
         back_btn = ttk.Button(nav_frame, text="← 返回安装界面", command=self.show_layer1)
         back_btn.pack(side=tk.LEFT)
         
-        lbl = ttk.Label(nav_frame, text="OpenClaw 控制台", font=('Helvetica', 16, 'bold'))
+        lbl = ttk.Label(nav_frame, text="ocbanana 控制台", font=('Helvetica', 16, 'bold'))
         lbl.pack(side=tk.LEFT, padx=20)
         
         # 左右分栏：左侧服务控制，右侧API配置
