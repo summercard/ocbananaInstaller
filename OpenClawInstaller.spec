@@ -21,7 +21,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='OpenClawInstaller',
+    name='ocbanana',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -40,11 +40,11 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='OpenClawInstaller',
+    name='ocbanana',
 )
 app = BUNDLE(
     coll,
-    name='OpenClawInstaller.app',
+    name='ocbanana.app',
     icon=None,
     bundle_identifier=None,
 )
