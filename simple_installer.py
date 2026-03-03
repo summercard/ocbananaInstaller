@@ -464,8 +464,8 @@ class OpenClawApp:
         create_button(col1_frame, "3. 下载 Node.js\n(LTS长期支持版)", self.cmd_download_node)
         create_button(col1_frame, "4. 安装 Git", self.cmd_install_git)
 
-        # 中列：安装 ocbanana
-        col2_frame = ttk.LabelFrame(btn_container, text="安装 ocbanana")
+        # 中列：安装 OpenClaw
+        col2_frame = ttk.LabelFrame(btn_container, text="安装 OpenClaw")
         col2_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
         create_button(col2_frame, "🔮 邪修：Claude Code安装法", self.show_layer4)
@@ -487,7 +487,7 @@ class OpenClawApp:
         back_btn = ttk.Button(nav_frame, text="← 返回安装界面", command=self.show_layer1)
         back_btn.pack(side=tk.LEFT)
         
-        lbl = ttk.Label(nav_frame, text="ocbanana 控制台", font=('Helvetica', 16, 'bold'))
+        lbl = ttk.Label(nav_frame, text="OpenClaw 控制台", font=('Helvetica', 16, 'bold'))
         lbl.pack(side=tk.LEFT, padx=20)
         
         # 左右分栏：左侧服务控制，右侧API配置
