@@ -148,6 +148,55 @@ class OpenClawApp:
         # 固定使用的 Gateway Token
         self.gateway_token = "8ab524d343c8b93b99b3a0c5babcf4ab108a1b3cccb03fef"
         
+        # 简化的配置变量
+        self.cfg_vars = {
+            'port': tk.StringVar(value='18789'),
+            'api_type': tk.StringVar(value='minimax'),
+            'api_url': tk.StringVar(value='https://api.minimax.chat/v1'),
+            'api_key': tk.StringVar(),
+            'model_name': tk.StringVar(value='MiniMax-M2.1')
+        }
+        
+        # API 服务商配置信息
+        self.api_provider_info = {
+            'minimax': {
+                'name': 'MiniMax',
+                'provider': 'minimax',
+                'baseUrl': 'https://api.minimax.chat/v1',
+                'apiType': 'openai-completions',
+                'envKey': 'MINIMAX_API_KEY',
+                'defaultModel': 'MiniMax-M2.1',
+                'input': ['text'],
+                'reasoning': False,
+                'contextWindow': 200000,
+                'maxTokens': 8192
+            },
+            'bigmodel': {
+                'name': 'BigModel (智谱)',
+                'provider': 'bigmodel',
+                'baseUrl': 'https://open.bigmodel.cn/api/paas/v4',
+                'apiType': 'openai-completions',
+                'envKey': 'BIGMODEL_API_KEY',
+                'defaultModel': 'glm-4',
+                'input': ['text'],
+                'reasoning': False,
+                'contextWindow': 128000,
+                'maxTokens': 8192
+            },
+            'google': {
+                'name': 'Google Gemini',
+                'provider': 'google',
+                'baseUrl': 'https://generativelanguage.googleapis.com/v1beta',
+                'apiType': 'google-generative-ai',
+                'envKey': 'GEMINI_API_KEY',
+                'defaultModel': 'gemini-2.5-flash-preview-05-20',
+                'input': ['text', 'image'],
+                'reasoning': True,
+                'contextWindow': 1000000,
+                'maxTokens': 64000
+            }
+        }
+        
         self.create_ui()
         self.load_config()
 
