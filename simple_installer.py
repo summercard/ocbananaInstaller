@@ -520,94 +520,34 @@ class OpenClawApp:
         ttk.Button(ctrl_frame, text="ℹ 查看状态 (刷新指示灯)", command=self.cmd_check_status).pack(fill=tk.X, padx=10, pady=5)
         ttk.Button(ctrl_frame, text="🌐 打开 Web UI (浏览器)", command=self.cmd_open_webui).pack(fill=tk.X, padx=10, pady=5)
 
-        # 右侧：API 配置
-        cfg_frame = ttk.LabelFrame(content_frame, text="API 配置 (原生 openclaw.json)")
-        cfg_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
+        # 右侧：让 Claude Code 做
+        claude_frame = ttk.LabelFrame(content_frame, text="让 Claude Code 做")
+        claude_frame.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=(5, 0))
 
-        # API 服务商配置信息
-        self.api_provider_info = {
-            'minimax': {
-                'name': 'MiniMax',
-                'provider': 'minimax',
-                'baseUrl': 'https://api.minimax.chat/v1',
-                'apiType': 'openai-completions',
-                'envKey': 'MINIMAX_API_KEY',
-                'defaultModel': 'MiniMax-M2.1',
-                'input': ['text'],
-                'reasoning': False,
-                'contextWindow': 200000,
-                'maxTokens': 8192
-            },
-            'bigmodel': {
-                'name': 'BigModel (智谱)',
-                'provider': 'bigmodel',
-                'baseUrl': 'https://open.bigmodel.cn/api/paas/v4',
-                'apiType': 'openai-completions',
-                'envKey': 'BIGMODEL_API_KEY',
-                'defaultModel': 'glm-4',
-                'input': ['text'],
-                'reasoning': False,
-                'contextWindow': 128000,
-                'maxTokens': 8192
-            },
-            'google': {
-                'name': 'Google Gemini',
-                'provider': 'google',
-                'baseUrl': 'https://generativelanguage.googleapis.com/v1beta',
-                'apiType': 'google-generative-ai',
-                'envKey': 'GEMINI_API_KEY',
-                'defaultModel': 'gemini-2.5-flash-preview-05-20',
-                'input': ['text', 'image'],
-                'reasoning': True,
-                'contextWindow': 1000000,
-                'maxTokens': 64000
-            }
-        }
-
-        # 表单字段
-        self.cfg_vars = {
-            'api_type': tk.StringVar(value='minimax'),
-            'api_url': tk.StringVar(value='https://api.minimax.chat/v1'),
-            'api_key': tk.StringVar(),
-            'model_name': tk.StringVar(value='MiniMax-M2.1'),
-            'port': tk.StringVar(value='18789')
-        }
-
-        # 当选择不同的 API 服务商时，自动填充对应的 URL
-        def on_api_type_change(*args):
-            api_type = self.cfg_vars['api_type'].get()
-            if api_type in self.api_provider_info:
-                info = self.api_provider_info[api_type]
-                self.cfg_vars['api_url'].set(info['baseUrl'])
-                self.cfg_vars['model_name'].set(info['defaultModel'])
-
-        self.cfg_vars['api_type'].trace_add('write', on_api_type_change)
-
-        fields = [
-            ("API 服务商:", 'api_type'),
-            ("API URL:", 'api_url'),
-            ("API Key:", 'api_key'),
-            ("模型名称:", 'model_name'),
-            ("服务端口:", 'port')
+        # 预设任务列表
+        tasks = [
+            "帮我安装openclaw",
+            "检查openclaw代码",
+            "帮我安装openclaw飞书插件",
+            "帮我清理openclaw进程"
         ]
 
-        for idx, (label_text, var_name) in enumerate(fields):
-            f = ttk.Frame(cfg_frame)
-            f.pack(fill=tk.X, padx=10, pady=3)
-            ttk.Label(f, text=label_text, width=12).pack(side=tk.LEFT)
-            if var_name == 'api_type':
-                cb = ttk.Combobox(f, textvariable=self.cfg_vars[var_name], values=['minimax', 'bigmodel', 'google'], state='readonly')
-                cb.pack(side=tk.LEFT, fill=tk.X, expand=True)
-            elif var_name == 'api_key':
-                ttk.Entry(f, textvariable=self.cfg_vars[var_name], show="*").pack(side=tk.LEFT, fill=tk.X, expand=True)
-            else:
-                ttk.Entry(f, textvariable=self.cfg_vars[var_name]).pack(side=tk.LEFT, fill=tk.X, expand=True)
-
-        # 两个按钮：新增 API 服务 和 更新 API
-        btn_frame = ttk.Frame(cfg_frame)
-        btn_frame.pack(pady=10)
-        ttk.Button(btn_frame, text="➕ 新增 API 服务", command=self.cmd_add_api_service).pack(side=tk.LEFT, padx=5)
-        ttk.Button(btn_frame, text="🔄 更新已有 API", command=self.cmd_update_api).pack(side=tk.LEFT, padx=5)
+        # 为每个任务创建一行：输入框 + 按钮
+        for i, task in enumerate(tasks):
+            row_frame = ttk.Frame(claude_frame)
+            row_frame.pack(fill=tk.X, padx=10, pady=5)
+            
+            # 输入框
+            entry = ttk.Entry(row_frame, textvariable=tk.StringVar(value=task))
+            entry.pack(side=tk.LEFT, fill=tk.X, expand=True, padx=(0, 5))
+            
+            # 按钮
+            btn = ttk.Button(
+                row_frame, 
+                text="让 Claude Code 做 →", 
+                command=lambda e=entry: self.cmd_run_claude_task(e.get())
+            )
+            btn.pack(side=tk.RIGHT)
 
     def show_layer1(self):
         self.layer2_frame.pack_forget()
@@ -1192,6 +1132,40 @@ A: 如需更多帮助，您可以：
                 self.log_terminal("✅ 已在新终端窗口中打开 Claude\n")
             except Exception as e:
                 self.log_terminal(f"❌ 打开新终端失败: {str(e)}\n")
+
+    def cmd_run_claude_task(self, task_text):
+        """打开 Claude 并输入指定内容"""
+        if not task_text or not task_text.strip():
+            self.log_terminal("⚠️ 输入内容为空，请先输入任务描述\n")
+            return
+        
+        target_os = self.os_var.get()
+        self.log_terminal(f"\n[让 Claude Code 完成任务]\n任务: {task_text}\n")
+        
+        # 先打开 Claude，然后输入内容
+        if target_os == "windows":
+            # Windows: 打开 CMD 并输入内容
+            cmd = f'start cmd /k "claude && echo {task_text}"'
+            try:
+                subprocess.Popen(cmd, shell=True)
+                self.log_terminal("✅ 已打开 Claude 并输入任务\n")
+            except Exception as e:
+                self.log_terminal(f"❌ 打开失败: {str(e)}\n")
+        else:
+            # macOS: 打开 Terminal 并输入内容
+            script = f'''
+            tell application "Terminal"
+                activate
+                do script "claude"
+                delay 2
+                do script "{task_text}" in front window
+            end tell
+            '''
+            try:
+                subprocess.run(['osascript', '-e', script])
+                self.log_terminal("✅ 已打开 Claude 并输入任务\n")
+            except Exception as e:
+                self.log_terminal(f"❌ 打开失败: {str(e)}\n")
 
     def cmd_download_node(self):
         """打开 Node.js LTS 下载页面"""
