@@ -10,7 +10,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [windows-latest, macos-latest, macos-12, ubuntu-latest]
+        os: [windows-latest, macos-latest]
         include:
           - os: windows-latest
             os_name: windows
