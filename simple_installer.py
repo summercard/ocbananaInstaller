@@ -1192,23 +1192,33 @@ A: 如需更多帮助，您可以：
         target_os = self.os_var.get()
         self.log_terminal(f"\n[让 Claude Code 完成任务]\n任务: {task_text}\n")
         
-        # 先打开 Claude，然后输入内容
+        # 先将任务文本复制到剪贴板
+        try:
+            subprocess.run(['pbcopy'], input=task_text, text=True, capture_output=True)
+        except Exception as e:
+            self.log_terminal(f"⚠️ 复制到剪贴板失败: {str(e)}\n")
+        
         if target_os == "windows":
-            # Windows: 打开 CMD 并输入内容
-            cmd = f'start cmd /k "claude && echo {task_text}"'
+            # Windows: 打开 CMD，输入内容后粘贴
+            cmd = f'start cmd /k "claude"'
             try:
                 subprocess.Popen(cmd, shell=True)
-                self.log_terminal("✅ 已打开 Claude 并输入任务\n")
+                self.log_terminal("✅ 已打开 Claude。\n📋 任务已复制到剪贴板，请在 Claude 界面按 Cmd+V 粘贴。\n")
             except Exception as e:
                 self.log_terminal(f"❌ 打开失败: {str(e)}\n")
         else:
-            # macOS: 打开 Terminal 并输入内容
-            script = f'''
+            # macOS: 打开 Terminal，复制内容到剪贴板
+            script = '''
             tell application "Terminal"
                 activate
                 do script "claude"
-                delay 2
-                do script "{task_text}" in front window
+            end tell
+            '''
+            try:
+                subprocess.run(['osascript', '-e', script], capture_output=True)
+                self.log_terminal("✅ 已打开 Claude。\n📋 任务已复制到剪贴板，请在 Claude 界面按 Cmd+V 粘贴。\n")
+            except Exception as e:
+                self.log_terminal(f"❌ 打开失败: {str(e)}\n")
             end tell
             '''
             try:
