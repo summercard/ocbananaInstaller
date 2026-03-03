@@ -134,8 +134,8 @@ class OpenClawApp:
     def __init__(self, root: tk.Tk):
         self.root = root
         self.root.title("ocbanana 安装与配置台")
-        self.root.geometry("850x850")
-        self.root.minsize(900, 750)
+        self.root.geometry("900x950")
+        self.root.minsize(900, 900)
         self.center_window()
         
         # 尝试设置窗口图标
