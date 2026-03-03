@@ -468,9 +468,9 @@ class OpenClawApp:
         col2_frame = ttk.LabelFrame(btn_container, text="安装 OpenClaw")
         col2_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
-        create_button(col2_frame, "5. 安装 OpenClaw 核心", self.cmd_install_openclaw)
+        create_button(col2_frame, "🔮 邪修：Claude Code安装法", self.show_layer4)
         create_button(col2_frame, "6. 测试安装", self.cmd_test_openclaw)
-        create_button(col2_frame, "7. OpenClaw 初始配置\n(新终端窗口)", self.cmd_openclaw_init)
+        # create_button(col2_frame, "7. OpenClaw 初始配置\n(新终端窗口)", self.cmd_openclaw_init)
 
         # 右列：配置环境
         col3_frame = ttk.LabelFrame(btn_container, text="配置环境")
