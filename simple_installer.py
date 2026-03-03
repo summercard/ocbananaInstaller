@@ -447,6 +447,16 @@ class OpenClawApp:
         style.map('Orange.TButton',
                  background=[('active', '#3d2210'), ('pressed', '#2a170b')])
 
+        # Purple按钮样式（用于邪修安装法）
+        style.configure('Purple.TButton',
+                     background='#5c3d7a',
+                     foreground='white',
+                     font=('Helvetica', 10, 'bold'),
+                     borderwidth=3,
+                     relief='raised')
+        style.map('Purple.TButton',
+                 background=[('active', '#3d2a5a'), ('pressed', '#2a1a3a')])
+
         # 定义按钮样式函数
         def create_button(parent, text, command, style_name='Dark.TButton'):
             """创建自定义样式的按钮，支持多行文本"""
@@ -1105,7 +1115,7 @@ A: 如需更多帮助，您可以：
         col1_frame = ttk.LabelFrame(btn_frame, text="步骤1：安装 Claude Code")
         col1_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
-        tk.Button(col1_frame, text="📦 安装 Claude Code", command=self.cmd_install_claude, bg="#404040", fg="white", font=('Helvetica', 11), height=2).pack(fill=tk.X, padx=10, pady=10)
+        ttk.Button(col1_frame, text="📦 安装 Claude Code", command=self.cmd_install_claude, style='Dark.TButton', width=30).pack(fill=tk.X, padx=10, pady=10)
 
         ttk.Label(col1_frame, text="执行命令:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
         cmd_label = ttk.Label(col1_frame, text="npm install -g @anthropic-ai/claude-code", font=('Consolas', 9), foreground="blue")
@@ -1115,8 +1125,8 @@ A: 如需更多帮助，您可以：
         col2_frame = ttk.LabelFrame(btn_frame, text="步骤2：安装 cc-switch")
         col2_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
-        tk.Button(col2_frame, text="🔄 安装 cc-switch (Mac)", command=self.cmd_install_ccswitch_mac, bg="#404040", fg="white", font=('Helvetica', 11)).pack(fill=tk.X, padx=10, pady=5)
-        tk.Button(col2_frame, text="🌐 打开下载页面 (Windows)", command=self.cmd_open_ccswitch_windows, bg="#404040", fg="white", font=('Helvetica', 11)).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(col2_frame, text="🔄 安装 cc-switch (Mac)", command=self.cmd_install_ccswitch_mac, style='Dark.TButton', width=30).pack(fill=tk.X, padx=10, pady=5)
+        ttk.Button(col2_frame, text="🌐 打开下载页面 (Windows)", command=self.cmd_open_ccswitch_windows, style='Dark.TButton', width=30).pack(fill=tk.X, padx=10, pady=5)
 
         ttk.Label(col2_frame, text="⚠️ 重要:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
         ttk.Label(col2_frame, text="安装后在 cc-switch 中给 Claude Code 配置大模型", font=('Helvetica', 9), foreground="red").pack(anchor="w", padx=10, pady=(0, 10))
@@ -1125,7 +1135,7 @@ A: 如需更多帮助，您可以：
         col3_frame = ttk.LabelFrame(btn_frame, text="步骤3：启动和使用")
         col3_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
 
-        tk.Button(col3_frame, text="🚀 打开 Claude", command=self.cmd_open_claude, bg="#404040", fg="white", font=('Helvetica', 11), height=2).pack(fill=tk.X, padx=10, pady=10)
+        ttk.Button(col3_frame, text="🚀 打开 Claude", command=self.cmd_open_claude, style='Dark.TButton', width=30).pack(fill=tk.X, padx=10, pady=10)
 
         ttk.Label(col3_frame, text="💡 使用方法:", font=('Helvetica', 9, 'bold')).pack(anchor="w", padx=10)
         usage_text = "打开 Claude Code 后，输入：\n\"帮我安装 openclaw，并且配置 xxxapikey，apikey：xxxxxx\""
