@@ -1,4 +1,4 @@
-# Build OpenClawInstaller
+# Build OCBanana
 
 on:
   push:
@@ -24,10 +24,6 @@ jobs:
             os_name: macos-intel
             ext: .app
             arch: x64
-          - os: ubuntu-latest
-            os_name: linux
-            ext: ""
-            arch: x64
 
     runs-on: ${{ matrix.os }}
 
@@ -48,45 +44,38 @@ jobs:
     - name: 构建 Windows 版本
       if: matrix.os == 'windows-latest'
       run: |
-        pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm simple_installer.py
+        pyinstaller --name=OCBanana --windowed --onefile --clean --noconfirm simple_installer.py
         cd dist
-        mv OpenClawInstaller.exe OpenClawInstaller-Windows-x64.exe
+        mv OCBanana.exe OCBanana-Windows-x64.exe
 
     - name: 构建 macOS 版本
       if: matrix.os == 'macos-latest'
       run: |
-        pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm simple_installer.py
+        pyinstaller --name=OCBanana --windowed --onefile --clean --noconfirm simple_installer.py
         cd dist
         ls -la
-        if [ -f "OpenClawInstaller.app" ]; then
-          zip -r OpenClawInstaller-macOS-arm64.zip OpenClawInstaller.app
+        if [ -f "OCBanana.app" ]; then
+          zip -r OCBanana-macOS-arm64.zip OCBanana.app
         else
-          zip -r OpenClawInstaller-macOS-arm64.zip OpenClawInstaller
+          zip -r OCBanana-macOS-arm64.zip OCBanana
         fi
 
     - name: 构建 macOS Intel 版本
       if: matrix.os == 'macos-12'
       run: |
-        pyinstaller --name=OpenClawInstaller --windowed --onefile --clean --noconfirm simple_installer.py
+        pyinstaller --name=OCBanana --windowed --onefile --clean --noconfirm simple_installer.py
         cd dist
         ls -la
-        if [ -f "OpenClawInstaller.app" ]; then
-          zip -r OpenClawInstaller-macOS-x64.zip OpenClawInstaller.app
+        if [ -f "OCBanana.app" ]; then
+          zip -r OCBanana-macOS-x64.zip OCBanana.app
         else
-          zip -r OpenClawInstaller-macOS-x64.zip OpenClawInstaller
+          zip -r OCBanana-macOS-x64.zip OCBanana
         fi
-
-    - name: 构建 Linux 版本
-      if: matrix.os == 'ubuntu-latest'
-      run: |
-        pyinstaller --name=OpenClawInstaller --onefile --clean --noconfirm simple_installer.py
-        cd dist
-        tar czf OpenClawInstaller-Linux-x64.tar.gz OpenClawInstaller
 
     - name: 上传构建产物
       uses: actions/upload-artifact@v4
       with:
-        name: OpenClawInstaller-${{ matrix.os_name }}
+        name: OCBanana-${{ matrix.os_name }}
         path: dist/*
         retention-days: 30
         if-no-files-found: error
@@ -112,10 +101,9 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          artifacts/OpenClawInstaller-windows/OpenClawInstaller-Windows-x64.exe
-          artifacts/OpenClawInstaller-macos/OpenClawInstaller-macOS-arm64.zip
-          artifacts/OpenClawInstaller-macos-intel/OpenClawInstaller-macOS-x64.zip
-          artifacts/OpenClawInstaller-linux/OpenClawInstaller-Linux-x64.tar.gz
+          artifacts/OCBanana-windows/OCBanana-Windows-x64.exe
+          artifacts/OCBanana-macos/OCBanana-macOS-arm64.zip
+          artifacts/OCBanana-macos-intel/OCBanana-macOS-x64.zip
         draft: false
         prerelease: false
         generate_release_notes: true
