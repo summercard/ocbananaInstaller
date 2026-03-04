@@ -971,7 +971,8 @@ A: 如需更多帮助，您可以：
             git --version
             """
         else:
-            cmd = "echo 正在通过 winget静默安装 Git... & winget install --id Git.Git -e --source winget --accept-package-agreements --accept-source-agreements & echo 安装执行结束。"
+            # 使用华为云镜像下载安装 Git
+            cmd = "echo 正在通过华为云镜像下载安装 Git... & curl -L https://mirrors.huaweicloud.com/git-for-windows/v2.48.1.windows.1/Git-2.48.1-64-bit.exe -o git_setup.exe & git_setup.exe & echo 安装执行结束。"
         self.run_command_in_bg("安装 Git", cmd)
 
     def cmd_install_openclaw(self):
